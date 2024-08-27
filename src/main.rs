@@ -1,4 +1,8 @@
+mod consults;
+mod table;
 
+use consults::*;
+use table::Table;
 
 fn main() {
     // lets read the args
@@ -14,6 +18,38 @@ fn main() {
 
     println!("File: {}", file);
     println!("Consult: [{}]", consult);
+
+    let table = Table::new(file);
+    println!("Table name: {}", table.get_file_name());
+
+    let splitted_consult = consult.split(" ").collect::<Vec<&str>>();
+    let command = splitted_consult[0];
+
+    match command {
+        "select" | "SELECT" => {
+            let command = Select::new();
+
+            if !command.is_valid_query(&consult) {
+                println!("[INVALID_SYNTAX]: Invalid select query");
+                return;
+            }
+
+            command.get_query_parts(&consult);
+        }
+        "insert" | "INSERT" => {
+            println!("Insert command");
+        }
+        "update" | "UPDATE" => {
+            println!("Update command");
+        }
+        "delete" | "DELETE" => {
+            println!("Delete command");
+        }
+        _ => {
+            println!("[INVALID_SYNTAX]: Invalid command");
+            return;
+        }
+    }
 }
 
 fn valid_number_of_args(args: &usize) -> bool {
