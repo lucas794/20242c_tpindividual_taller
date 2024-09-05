@@ -2,6 +2,9 @@ mod consults;
 mod extractor;
 mod table;
 
+
+use std::io::{self, Write};
+
 use consults::*;
 use extractor::*;
 use table::*;
@@ -54,7 +57,26 @@ fn main() {
 
             let columns = extractor.extract_columns(&consult);
 
-            let _ = table.execute_select(columns);
+            let csv_data = table.execute_select(columns);
+
+            match csv_data {
+                Ok(data) => {
+                    // lets write stdout 
+                    let stdout = io::stdout();
+                    
+                    let mut handle = io::BufWriter::new(stdout.lock());
+                    
+                    for line in data {
+                        let temp_line = line.join(",");
+                        handle.write(temp_line.as_bytes()).unwrap();
+                        handle.write(b"\n").unwrap();
+                    }
+                }
+                Err(_) => {
+                    println!("[INVALID_SYNTAX]: Invalid columns inside the query");
+                    return;
+                }
+            }
         }
         "INSERT" => {
             println!("Insert command");

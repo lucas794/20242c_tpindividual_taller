@@ -53,7 +53,7 @@ impl Table {
         table_name.to_string()
     }
 
-    pub fn execute_select(&mut self, columns: Vec<String>) -> Result<Vec<String>, std::io::Error> {
+    pub fn execute_select(&mut self, columns: Vec<String>) -> Result<Vec<Vec<String>>, std::io::Error> {
         // we need to match the index of the columns with the index of the csv
         // we need to read the csv and get the columns
         // we need to print the columns
@@ -108,12 +108,7 @@ impl Table {
 
             result.push(selected_columns);
         }
-        println!("Printing result..");
 
-        for r in result {
-            println!("{:?}", r);
-        }
-
-        Ok(Vec::new())
+        Ok(result)
     }
 }

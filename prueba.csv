@@ -1,0 +1,18 @@
+Table data: test
+Conditions: id = 5 AND Nombre = 'Lucas'
+Conditions: ()
+Index columns inside file: ["Nombre", "Apellido", "Edad", "Correo electronico", "Profesion"]
+splitted_columns: ["Nombre", "Apellido"]
+Index columns: [0, 1]
+Reading file... ./test.csv
+Nombre,Apellido
+Juan,Perez
+Maria,Gomez
+Carlos,Sánchez
+Ana,Ruiz
+Luis,Martínez
+Laura,Domínguez
+Pedro,Fernández
+Lucía,Ramos
+Diego,Navarro
+Paula,Hernández
