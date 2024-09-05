@@ -1,8 +1,10 @@
 mod consults;
+mod extractor;
 mod table;
 
 use consults::*;
-use table::Table;
+use extractor::*;
+use table::*;
 
 fn main() {
     // lets read the args
@@ -16,17 +18,23 @@ fn main() {
     let file = &args[1];
     let consult = &args[2].trim().to_string();
 
-    println!("File: {}", file);
-    println!("Consult: [{}]", consult);
+    let opening_table = Table::new(file);
 
-    let table = Table::new(file);
-    println!("Table name: {}", table.get_file_name());
+    let mut table = match opening_table {
+        Ok(table) => table,
+        Err(_) => {
+            println!("[INVALID_TABLE]: The selected table is invalid");
+            return;
+        }
+    };
 
     let splitted_consult = consult.split(" ").collect::<Vec<&str>>();
     let command = splitted_consult[0];
 
+    let extractor = Extractor::new();
+
     match command {
-        "select" | "SELECT" => {
+        "SELECT" => {
             let command = Select::new();
 
             if !command.is_valid_query(&consult) {
@@ -34,15 +42,27 @@ fn main() {
                 return;
             }
 
-            command.get_query_parts(&consult);
+            let table_name = extractor.extract_table(&consult);
+
+            if table_name != table.get_file_name() {
+                println!("[INVALID_TABLE]: Table name does not match");
+                return;
+            }
+
+            let conditions = extractor.extract_conditions(&consult);
+            println!("Conditions: {:?}", conditions);
+
+            let columns = extractor.extract_columns(&consult);
+
+            let _ = table.execute_select(columns);
         }
-        "insert" | "INSERT" => {
+        "INSERT" => {
             println!("Insert command");
         }
-        "update" | "UPDATE" => {
+        "UPDATE" => {
             println!("Update command");
         }
-        "delete" | "DELETE" => {
+        "DELETE" => {
             println!("Delete command");
         }
         _ => {
