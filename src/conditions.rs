@@ -1,22 +1,26 @@
 use std::collections::HashMap;
 
-pub enum Value {
+
+// tried recursive descent parser but i lost so much time at this point.
+
+/// representation of the type of value can be used for conditions
+pub enum Value<'a> {
+    /// For now we only support int & string.
     Integer(i64),
-    String(String),
+    String(&'a str), 
+    //String(String), // may be better to use lifetimes i think.
     // pls dont ask for other type.
 }
 
-pub struct Conditions {
-    data: HashMap<String, Value>,
+/// representation of the condition that can be used on a query
+pub struct Conditions<'a> {
+    data: HashMap<String, Value<'a>>,
 }
 
-impl Conditions {
-
-    pub fn new(data: HashMap<String, Value>) -> Self {
+impl<'a> Conditions<'a> {
+    pub fn new(data: HashMap<String, Value<'a>>) -> Self {
         Conditions { data }
     }
-
-
     pub fn matches_condition(&self, conditions: &str) -> bool {
         let splitted_conditions = conditions.split_whitespace().collect::<Vec<&str>>();
 
@@ -117,6 +121,65 @@ impl Conditions {
             }
         } else {
             false
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_condition_and() {
+        let condition_hash: HashMap<String, Value> = HashMap::from([
+            ("name".to_string(), Value::String("John")),
+            ("age".to_string(), Value::Integer(20)),
+        ]);
+
+        let conditions = Conditions::new(condition_hash);
+
+        let str_conditions = vec![
+            "name = 'John' AND age = 20",
+            "age = 20 AND name = 'John'", // backwards should work too..
+        ];
+
+        for str_condition in str_conditions {
+            assert_eq!(conditions.matches_condition(str_condition), true);
+        }
+    }
+
+    #[test]
+    fn test_condition_or() {
+        let condition_hash: HashMap<String, Value> = HashMap::from([
+            ("name".to_string(), Value::String("John")),
+            ("age".to_string(), Value::Integer(20)),
+        ]);
+
+        let conditions = Conditions::new(condition_hash);
+
+        let str_conditions = vec!["name = 'John'", "age = 20 OR name = 'John'"];
+
+        for str_condition in str_conditions {
+            assert_eq!(conditions.matches_condition(str_condition), true);
+        }
+    }
+
+    #[test]
+    fn test_condition_not() {
+        let condition_hash: HashMap<String, Value> = HashMap::from([
+            ("name".to_string(), Value::String("John")),
+            ("age".to_string(), Value::Integer(20)),
+        ]);
+
+        let conditions = Conditions::new(condition_hash);
+
+        let str_conditions = vec![
+            "NOT name = 'John'", // not
+            "NOT age = 20",
+        ];
+
+        for str_condition in str_conditions {
+            assert_eq!(conditions.matches_condition(str_condition), true);
         }
     }
 }

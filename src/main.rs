@@ -5,9 +5,9 @@ mod table;
 
 use std::io::{self, Write};
 
-use consults::*;
-use extractor::*;
-use table::*;
+use consults::{Select};
+use extractor::Extractor;
+use table::Table;
 
 fn main() {
     // lets read the args
@@ -46,7 +46,6 @@ fn main() {
             }
 
             let table_name = extractor.extract_table(&consult);
-
             if table_name != table.get_file_name() {
                 println!("[INVALID_TABLE]: Table name does not match");
                 return;

@@ -1,3 +1,4 @@
+/// Select representation for the SQL query
 pub struct Select;
 pub struct Insert;
 pub struct Update;
@@ -33,5 +34,23 @@ impl Update {
 impl Delete {
     pub fn new() -> Delete {
         Delete
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Select;
+
+    #[test]
+    fn test_select_invalid_query() {
+        let select = Select::new();
+        let invalid_consults: Vec<&str> = Vec::from([
+            "name, age FROM table",
+            "SELECT name, age table;",
+            "SELECT name, age",
+        ]);
+        for invalid_query in invalid_consults {
+            assert_eq!(select.is_valid_query(&invalid_query.to_string()), false);
+        }
     }
 }

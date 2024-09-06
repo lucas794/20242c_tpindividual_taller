@@ -75,7 +75,7 @@ impl Table {
         let index_columns = splitted_columns
             .iter()
             .enumerate()
-            .filter(|(i, c)| columns.contains(&c.to_string()))
+            .filter(|(_i, c)| columns.contains(&c.to_string()))
             .map(|(i, c)| i)
             .collect::<Vec<usize>>();
 
@@ -110,5 +110,32 @@ impl Table {
         }
 
         Ok(result)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[test]
+    fn test_table_new() {
+        let table = Table::new(&"./test.csv".to_string()).unwrap();
+        assert_eq!(table.get_file_name(), "test".to_string());
+    }
+
+    #[test]
+    fn test_table_invalid_table() {
+        let table = Table::new(&"./invalidtable.csv".to_string());
+        assert_eq!(table.is_err(), true);
+    }
+
+    #[test]
+    fn test_table_invalid_column() {
+        let mut table = Table::new(&"./test.csv".to_string()).unwrap();
+
+        // tesis is the invalid columns
+        let columns = vec!["Edad".to_string(), "Tesis".to_string()];
+        let result = table.execute_select(columns);
+        assert_eq!(result.is_err(), true);
     }
 }

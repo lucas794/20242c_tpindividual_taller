@@ -109,3 +109,34 @@ impl Extractor {
         };
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_extractor_from_consult_extract_columns() {
+        let extractor = Extractor::new();
+        let consult: &str = "SELECT name, age FROM table;";
+        let columns = extractor.extract_columns(&consult.to_string());
+
+        assert_eq!(columns, vec!["name".to_string(), "age".to_string()]);
+    }
+
+    #[test]
+    fn test_extractor_from_consult_extract_table() {
+        let extractor = Extractor::new();
+
+        // here i test the table name
+        // should return "table" for both cases
+        let consults: Vec<&str> = Vec::from([
+            "SELECT name, age FROM table;",
+            "SELECT name, age FROM table WHERE name = 'John';",
+            "SELECT name, are FROM table ORDER BY name;",
+        ]);
+
+        for consult in consults {
+            let table = extractor.extract_table(&consult.to_string());
+            assert_eq!(table, "table".to_string());
+        }
+    }
+}
