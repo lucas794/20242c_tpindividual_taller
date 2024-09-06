@@ -1,11 +1,13 @@
+mod conditions;
 mod consults;
+mod errors;
 mod extractor;
 mod table;
 
-
 use std::io::{self, Write};
 
-use consults::{Select};
+use consults::Select;
+use errors::TPErrors;
 use extractor::Extractor;
 use table::Table;
 
@@ -13,21 +15,39 @@ fn main() {
     // lets read the args
     let args: Vec<String> = std::env::args().collect();
 
+    if let Err(e) = run(args) {
+        eprintln!("{}", e);
+    }
+}
+
+/// check if the number of arguments is valid
+/// returns false if the number is equal or lower than 2
+fn valid_number_of_args(args: &usize) -> bool {
+    if *args <= 2 {
+        return false;
+    }
+    true
+}
+
+/// Executes the main logical problem of the program
+fn run(args: Vec<String>) -> Result<(), errors::TPErrors<'static>> {
     if !valid_number_of_args(&args.len()) {
-        return; // we stop the program, invalid number of arguments
+        // we stop the program, invalid number of arguments
+        return Err(TPErrors::InvalidGeneric("Invalid number of arguments"));
     }
 
     // Now, we have the arguments...
     let file = &args[1];
-    let consult = &args[2].trim().to_string();
+    let consult = &args[2].trim();
 
     let opening_table = Table::new(file);
 
     let mut table = match opening_table {
         Ok(table) => table,
         Err(_) => {
-            println!("[INVALID_TABLE]: The selected table is invalid");
-            return;
+            return Err(TPErrors::InvalidTable(
+                "Error opening the table - The selected table is invalid",
+            ));
         }
     };
 
@@ -40,31 +60,52 @@ fn main() {
         "SELECT" => {
             let command = Select::new();
 
-            if !command.is_valid_query(&consult) {
-                println!("[INVALID_SYNTAX]: Invalid select query");
-                return;
+            if !command.is_valid_query(consult) {
+                return Err(TPErrors::InvalidSyntax("Invalid select query"));
             }
 
-            let table_name = extractor.extract_table(&consult);
-            if table_name != table.get_file_name() {
-                println!("[INVALID_TABLE]: Table name does not match");
-                return;
-            }
+            match extractor.extract_table(&consult) {
+                Ok(table_name_from_query) => {
+                    let table_name = match table.get_file_name() {
+                        Ok(table_name) => table_name,
+                        Err(e) => {
+                            return Err(e);
+                        }
+                    };
 
-            let conditions = extractor.extract_conditions(&consult);
-            println!("Conditions: {:?}", conditions);
+                    if table_name_from_query != table_name {
+                        return Err(TPErrors::InvalidTable("Invalid table selected"));
+                    }
+                }
+                Err(e) => {
+                    return Err(e);
+                }
+            };
 
-            let columns = extractor.extract_columns(&consult);
+            // to use later.
+            let conditions = match extractor.extract_as_str_conditions(&consult) {
+                Ok(conditions) => conditions,
+                Err(e) => {
+                    return Err(e);
+                }
+            };
 
-            let csv_data = table.execute_select(columns);
+            let columns = match extractor.extract_columns(consult) {
+                Ok(columns) => columns,
+                Err(e) => {
+                    return Err(e);
+                }
+            };
+
+            let csv_data = table.execute_select(columns, conditions);
 
             match csv_data {
                 Ok(data) => {
-                    // lets write stdout 
+                    // lets write stdout
                     let stdout = io::stdout();
-                    
+
                     let mut handle = io::BufWriter::new(stdout.lock());
-                    
+
                     for line in data {
                         let temp_line = line.join(",");
                         handle.write(temp_line.as_bytes()).unwrap();
@@ -72,8 +113,7 @@ fn main() {
                     }
                 }
                 Err(_) => {
-                    println!("[INVALID_SYNTAX]: Invalid columns inside the query");
-                    return;
+                    return Err(TPErrors::InvalidSyntax("Invalid columns inside the query"));
                 }
             }
         }
@@ -87,16 +127,8 @@ fn main() {
             println!("Delete command");
         }
         _ => {
-            println!("[INVALID_SYNTAX]: Invalid command");
-            return;
+            return Err(TPErrors::InvalidSyntax("Invalid command"));
         }
     }
-}
-
-fn valid_number_of_args(args: &usize) -> bool {
-    if *args <= 2 {
-        println!("Invalid number of arguments!");
-        return false;
-    }
-    true
+    Ok(())
 }

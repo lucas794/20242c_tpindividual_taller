@@ -4,12 +4,14 @@ pub struct Insert;
 pub struct Update;
 pub struct Delete;
 
+/// implementation of the select query
 impl Select {
     pub fn new() -> Select {
         Select
     }
-
-    pub fn is_valid_query(&self, query: &String) -> bool {
+    /// A valid select query contains SELECT and FROM
+    /// if the query is valid, it will return true
+    pub fn is_valid_query<'a>(&self, query: &'a str) -> bool {
         let query = query.trim();
 
         if query.starts_with("SELECT") && query.contains("FROM") {
@@ -42,15 +44,15 @@ mod tests {
     use super::Select;
 
     #[test]
-    fn test_select_invalid_query() {
+    fn select_invalid_query() {
         let select = Select::new();
         let invalid_consults: Vec<&str> = Vec::from([
-            "name, age FROM table",
-            "SELECT name, age table;",
-            "SELECT name, age",
+            "name, age FROM table",    // missing select
+            "SELECT name, age table;", // missing a coma
+            "SELECT name, age",        // missing FROM
         ]);
         for invalid_query in invalid_consults {
-            assert_eq!(select.is_valid_query(&invalid_query.to_string()), false);
+            assert_eq!(select.is_valid_query(invalid_query), false);
         }
     }
 }

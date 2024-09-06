@@ -4,3 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+
+[[bin]]
+# we need to add reference sto conditions consults extractor and table
+name = "tp_individual"
+path = "src/main.rs"

@@ -1,22 +1,25 @@
 use std::{
+    collections::HashMap,
     fs::File,
-    io::{BufRead, Read, Seek},
+    io::{BufRead, Seek},
 };
 
-pub struct Table {
-    file_name: String,
+use crate::{
+    conditions::{Conditions, Value},
+    errors::TPErrors,
+};
+
+pub struct Table<'a> {
+    file_name: &'a str,
     file: File,
 }
 
-impl Table {
-    pub fn new(file_name: &String) -> Result<Self, std::io::Error> {
+impl<'a> Table<'a> {
+    pub fn new(file_name: &'a str) -> Result<Self, std::io::Error> {
         let file_reference = File::open(file_name);
 
         match file_reference {
-            Ok(file) => Ok(Table {
-                file: file,
-                file_name: file_name.to_string(),
-            }),
+            Ok(file) => Ok(Table { file, file_name }),
             Err(e) => {
                 println!("[INVALID_TABLE]: Error {}", e);
                 // lets throw error and stop the program
@@ -27,18 +30,17 @@ impl Table {
             }
         }
     }
-
-    pub fn get_file_name(&self) -> String {
-        // table name can be ./path/table.csv
-        // or ./table.csv
-        // or table.csv
-        // idea: split by /, get the last element, remove csv.
-
+    /// Get the file name of the table
+    /// # Example
+    /// ./path/table.csv -> table
+    /// ./table.csv -> table
+    pub fn get_file_name(&self) -> Result<&'a str, TPErrors<'static>> {
         let table_file = match self.file_name.split("/").last() {
             Some(name) => name,
             None => {
-                println!("Error getting table file name by unknown reason");
-                std::process::exit(1);
+                return Err(TPErrors::InvalidGeneric(
+                    "Error getting table file name by unknown reason",
+                ));
             }
         };
 
@@ -46,14 +48,20 @@ impl Table {
         let table_name = match table_file.split(".").next() {
             Some(name) => name,
             None => {
-                println!("Error getting table name, splitting by '.' failed");
-                std::process::exit(1);
+                return Err(TPErrors::InvalidGeneric(
+                    "Error getting table name, splitting by '.' failed",
+                ));
             }
         };
-        table_name.to_string()
+        Ok(table_name)
     }
-
-    pub fn execute_select(&mut self, columns: Vec<String>) -> Result<Vec<Vec<String>>, std::io::Error> {
+    /// given the columns of the table, and the conditions of the query (as String)
+    /// it will return the result of the query
+    pub fn execute_select(
+        &mut self,
+        columns: Vec<String>,
+        str_conditions: &str,
+    ) -> Result<Vec<Vec<String>>, std::io::Error> {
         // we need to match the index of the columns with the index of the csv
         // we need to read the csv and get the columns
         // we need to print the columns
@@ -69,73 +77,104 @@ impl Table {
 
         let splitted_columns = index_columns.split(",").collect::<Vec<&str>>();
 
-        println!("Index columns inside file: {:?}", splitted_columns);
-        println!("splitted_columns: {:?}", columns);
-
         let index_columns = splitted_columns
             .iter()
             .enumerate()
             .filter(|(_i, c)| columns.contains(&c.to_string()))
-            .map(|(i, c)| i)
+            .map(|(i, _c)| i)
             .collect::<Vec<usize>>();
 
-        println!("Index columns: {:?}", index_columns);
-
         if columns.len() != index_columns.len() {
-            println!("[INVALID_SYNTAX]: There are invalid columns inside the query");
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 "Invalid columns",
             ));
         }
-
-        // lets read the file line by line
         // and print the columns
-        println!("Reading file... {}", self.file_name);
-        self.file.seek(std::io::SeekFrom::Start(0))?;
+        self.file.seek(std::io::SeekFrom::Start(0))?; // lets place it after the columns name
         let mut result: Vec<Vec<String>> = Vec::new();
 
         // adding columns to the result
-        result.push(columns);
 
-        for line in std::io::BufReader::new(&self.file).lines().skip(1) {
-            let line = line?;
-            let splitted_line = line.split(",").collect::<Vec<&str>>();
-            let selected_columns = index_columns
-                .iter()
-                .map(|i| splitted_line[*i].to_string())
-                .collect::<Vec<String>>();
+        // skip to skip the columns..
+        for line_read in std::io::BufReader::new(&self.file).lines().skip(1) {
+            let line = line_read?;
+            let splitted_line = line.split(",").map(|s| s).collect::<Vec<&str>>();
 
-            result.push(selected_columns);
+            let (extracted_conditions, line_to_writte) =
+                self.extract_conditions(&index_columns, &splitted_line, &columns);
+
+            // now everything is clear and ready to check if conditions are met
+            let condition = Conditions::new(extracted_conditions);
+            if condition.matches_condition(str_conditions) {
+                result.push(line_to_writte);
+            }
+
+            //result.push(selected_columns);
         }
-
+        result.insert(0, columns); // to prevent clone, at the end the columns at the top of the vector.
         Ok(result)
+    }
+
+    /// Given a index of columns, the columns and the splitted line
+    /// we return a hash of conditions AND the line itself.
+    fn extract_conditions(
+        &self,
+        index_columns: &Vec<usize>,
+        splitted_line: &Vec<&str>,
+        columns: &Vec<String>,
+    ) -> (HashMap<String, Value>, Vec<String>) {
+        let selected_columns = index_columns
+            .iter()
+            .map(|i| splitted_line[*i])
+            .map(|s| s.to_string())
+            .collect::<Vec<String>>();
+
+        // for each column, we need to map the condition
+        let mut hash_conditions: HashMap<String, Value> = HashMap::new();
+        for (j, _col) in selected_columns.iter().enumerate() {
+            let column_condition = columns[j].as_str();
+
+            let trimmed_value = splitted_line[j].trim().to_string();
+            if let Some(v) = trimmed_value.parse::<i64>().ok() {
+                hash_conditions.insert(column_condition.to_string(), Value::Integer(v));
+            } else {
+                hash_conditions.insert(column_condition.to_string(), Value::String(trimmed_value));
+            }
+        }
+        (hash_conditions, selected_columns)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
-    fn test_table_new() {
-        let table = Table::new(&"./test.csv".to_string()).unwrap();
-        assert_eq!(table.get_file_name(), "test".to_string());
+    fn new() {
+        let table = Table::new("./test.csv").unwrap();
+        let filename = table.get_file_name().unwrap();
+        assert_eq!(filename, "test");
     }
 
     #[test]
-    fn test_table_invalid_table() {
-        let table = Table::new(&"./invalidtable.csv".to_string());
-        assert_eq!(table.is_err(), true);
+    fn invalid_table() {
+        let invalid_routes = vec!["./invalidtable.csv", "./invalidtable"];
+
+        for invalid_route in invalid_routes {
+            let table = Table::new(invalid_route);
+            assert_eq!(table.is_err(), true);
+        }
     }
 
     #[test]
-    fn test_table_invalid_column() {
-        let mut table = Table::new(&"./test.csv".to_string()).unwrap();
+    fn invalid_column() {
+        let mut table = Table::new("./test.csv").unwrap();
 
         // tesis is the invalid columns
         let columns = vec!["Edad".to_string(), "Tesis".to_string()];
-        let result = table.execute_select(columns);
+        let conditions = "WHERE name = 'John'";
+        let result = table.execute_select(columns, conditions);
         assert_eq!(result.is_err(), true);
     }
 }

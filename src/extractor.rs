@@ -1,17 +1,13 @@
-pub struct Extractor;
+use crate::errors::TPErrors;
 
-pub struct Condition {
-    negation: bool,
-    column: String,
-    value: String,
-}
+pub struct Extractor;
 
 impl Extractor {
     pub fn new() -> Extractor {
         Extractor
     }
 
-    pub fn extract_columns(&self, query: &String) -> Vec<String> {
+    pub fn extract_columns<'a>(&self, query: &'a str) -> Result<Vec<String>, TPErrors<'static>> {
         let query = query.trim();
 
         let where_pos = query.find("FROM");
@@ -26,14 +22,16 @@ impl Extractor {
                     &"INSERT" => "INSERT INTO".len(),
                     _ => {
                         // at this point this should never happened because we checked it before.
-                        println!("[INVALID_SYNTAX]: Invalid query (Missing SELECT, UPDATE, DELETE or INSERT INTO)");
-                        return Vec::new();
+                        return Err(TPErrors::InvalidSyntax(
+                            "Invalid query (Missing SELECT, UPDATE, DELETE or INSERT INTO)",
+                        ));
                     }
                 }
             }
             None => {
-                println!("[INVALID_SYNTAX]: Invalid query (Missing SELECT, UPDATE, DELETE or INSERT INTO)");
-                return Vec::new();
+                return Err(TPErrors::InvalidSyntax(
+                    "Invalid query (Missing SELECT, UPDATE, DELETE or INSERT INTO)",
+                ));
             }
         };
 
@@ -49,16 +47,17 @@ impl Extractor {
                     columns.push(c.trim().to_string());
                 });
 
-                return columns;
+                Ok(columns)
             }
             None => {
-                println!("[INVALID_SYNTAX]: Invalid select query (Missing FROM)");
-                return Vec::new();
+                return Err(TPErrors::InvalidSyntax(
+                    "Invalid select query (Missing FROM)",
+                ));
             }
         }
     }
 
-    pub fn extract_table(&self, query: &String) -> String {
+    pub fn extract_table<'a>(&self, query: &'a str) -> Result<&'a str, TPErrors<'static>> {
         let query = query.trim();
 
         let from_pos = query.find("FROM");
@@ -72,21 +71,25 @@ impl Extractor {
             (Some(position_from), Some(position_where)) => {
                 let table_data = &query[position_from + "FROM".len()..position_where];
                 let table_data = table_data.trim();
-                println!("Table data: {}", table_data);
-                return table_data.to_string();
+                Ok(table_data)
             }
             _ => {
                 if where_or_end_consult_pos.is_none() {
-                    println!("[INVALID_SYNTAX]: Invalid select query (Missing WHERE or ;)");
-                    return String::new();
+                    return Err(TPErrors::InvalidSyntax(
+                        "Invalid select query (Missing WHERE or ;)",
+                    ));
                 }
-                println!("[INVALID_SYNTAX]: Invalid select query (Missing FROM)");
-                return String::new();
+                return Err(TPErrors::InvalidSyntax(
+                    "Invalid select query (Missing FROM)",
+                ));
             }
         }
     }
 
-    pub fn extract_conditions(&self, query: &String) {
+    pub fn extract_as_str_conditions<'a>(
+        &self,
+        query: &'a str,
+    ) -> Result<&'a str, TPErrors<'static>> {
         let query = query.trim();
 
         if let Some(pos) = query.find("WHERE") {
@@ -95,18 +98,20 @@ impl Extractor {
             let end = match end {
                 Some(end) => end,
                 None => {
-                    println!("[INVALID_SYNTAX]: Invalid select query (Missing ORDER BY or ;)");
-                    return;
+                    return Err(TPErrors::InvalidSyntax(
+                        "Invalid select query (Missing ORDER BY or ;)",
+                    ));
                 }
             };
             let conditions = &query[pos + "WHERE".len()..end];
             let conditions = conditions.trim();
-            println!("Conditions: {}", conditions);
+            Ok(conditions)
         } else {
             // no conditions, but maybe ordered by..
-
-            return;
-        };
+            return Err(TPErrors::InvalidSyntax(
+                "Invalid select query (Missing WHERE)",
+            ));
+        }
     }
 }
 
@@ -114,16 +119,16 @@ impl Extractor {
 mod tests {
     use super::*;
     #[test]
-    fn test_extractor_from_consult_extract_columns() {
+    fn extract_columns() {
         let extractor = Extractor::new();
         let consult: &str = "SELECT name, age FROM table;";
-        let columns = extractor.extract_columns(&consult.to_string());
+        let columns = extractor.extract_columns(consult).unwrap();
 
         assert_eq!(columns, vec!["name".to_string(), "age".to_string()]);
     }
 
     #[test]
-    fn test_extractor_from_consult_extract_table() {
+    fn extract_table() {
         let extractor = Extractor::new();
 
         // here i test the table name
@@ -135,8 +140,23 @@ mod tests {
         ]);
 
         for consult in consults {
-            let table = extractor.extract_table(&consult.to_string());
-            assert_eq!(table, "table".to_string());
+            let table = extractor.extract_table(consult).unwrap();
+            assert_eq!(table, "table");
+        }
+    }
+
+    #[test]
+    fn conditions_query() {
+        let extractor = Extractor::new();
+
+        let vec_query: Vec<&str> = vec![
+            "SELECT * FROM users WHERE id = 5 AND level = 10;",
+            "SELECT * FROM users WHERE id = 5 AND level = 10 ORDER BY id;",
+        ];
+
+        for q in vec_query {
+            let conditions = extractor.extract_as_str_conditions(q).unwrap();
+            assert_eq!(conditions, "id = 5 AND level = 10");
         }
     }
 }
