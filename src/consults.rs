@@ -15,7 +15,10 @@ impl Select {
         let query = query.trim();
 
         if query.starts_with("SELECT") && query.contains("FROM") {
-            return true;
+            match query.chars().last() {
+                Some(';') => return true,
+                _ => return false,
+            }
         }
         false
     }

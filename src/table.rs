@@ -1,3 +1,4 @@
+use core::hash;
 use std::{
     collections::HashMap,
     fs::File,
@@ -60,7 +61,8 @@ impl<'a> Table<'a> {
     pub fn execute_select(
         &mut self,
         columns: Vec<String>,
-        str_conditions: &str,
+        opt_conditions_as_str: Option<&str>,
+        vector_sorting: Option<Vec<(String, bool)>>,
     ) -> Result<Vec<Vec<String>>, std::io::Error> {
         // we need to match the index of the columns with the index of the csv
         // we need to read the csv and get the columns
@@ -77,42 +79,68 @@ impl<'a> Table<'a> {
 
         let splitted_columns = index_columns.split(",").collect::<Vec<&str>>();
 
-        let index_columns = splitted_columns
-            .iter()
-            .enumerate()
-            .filter(|(_i, c)| columns.contains(&c.to_string()))
-            .map(|(i, _c)| i)
-            .collect::<Vec<usize>>();
+        // lets check if its a select *
+        let index_columns = if columns.len() == 1 && columns[0] == "*" {
+            (0..splitted_columns.len()).collect::<Vec<usize>>()
+        } else {
+            let temp_index = splitted_columns
+                .iter()
+                .enumerate()
+                .filter(|(_i, c)| columns.contains(&c.to_string()))
+                .map(|(i, _c)| i)
+                .collect::<Vec<usize>>();
 
-        if columns.len() != index_columns.len() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Invalid columns",
-            ));
-        }
+            if columns.len() != temp_index.len() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "Invalid columns",
+                ));
+            }
+            temp_index
+        };
+
+        let columns = if columns.len() == 1 && columns[0] == "*" {
+            // we need to handle the case if its a joker *
+            splitted_columns
+                .iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<String>>()
+        } else {
+            columns
+        };
+
         // and print the columns
         self.file.seek(std::io::SeekFrom::Start(0))?; // lets place it after the columns name
         let mut result: Vec<Vec<String>> = Vec::new();
 
-        // adding columns to the result
-
-        // skip to skip the columns..
         for line_read in std::io::BufReader::new(&self.file).lines().skip(1) {
             let line = line_read?;
             let splitted_line = line.split(",").map(|s| s).collect::<Vec<&str>>();
 
-            let (extracted_conditions, line_to_writte) =
-                self.extract_conditions(&index_columns, &splitted_line, &columns);
+            if opt_conditions_as_str.is_some() {
+                // we have conditions to check
+                let (extracted_conditions, line_to_writte) =
+                    self.extract_conditions(&index_columns, &splitted_line, &columns);
 
-            // now everything is clear and ready to check if conditions are met
-            let condition = Conditions::new(extracted_conditions);
-            if condition.matches_condition(str_conditions) {
+                // now everything is clear and ready to check if conditions are met
+                let condition = Conditions::new(extracted_conditions);
+                let str_conditions = opt_conditions_as_str.unwrap_or_else(|| "");
+
+                if condition.matches_condition(str_conditions) {
+                    result.push(line_to_writte);
+                }
+            } else {
+                // we need to push the matched columns to the vector
+                let line_to_writte = index_columns
+                    .iter()
+                    .map(|i| splitted_line[*i])
+                    .map(|s| s.to_string())
+                    .collect::<Vec<String>>();
                 result.push(line_to_writte);
             }
-
-            //result.push(selected_columns);
         }
         result.insert(0, columns); // to prevent clone, at the end the columns at the top of the vector.
+
         Ok(result)
     }
 
@@ -122,7 +150,7 @@ impl<'a> Table<'a> {
         &self,
         index_columns: &Vec<usize>,
         splitted_line: &Vec<&str>,
-        columns: &Vec<String>,
+        columns_from_query: &Vec<String>,
     ) -> (HashMap<String, Value>, Vec<String>) {
         let selected_columns = index_columns
             .iter()
@@ -133,9 +161,12 @@ impl<'a> Table<'a> {
         // for each column, we need to map the condition
         let mut hash_conditions: HashMap<String, Value> = HashMap::new();
         for (j, _col) in selected_columns.iter().enumerate() {
-            let column_condition = columns[j].as_str();
 
-            let trimmed_value = splitted_line[j].trim().to_string();
+            // with this we get the column that we want to check
+            let column_condition = columns_from_query[j].as_str();
+            // with this we get the value of the column
+            let trimmed_value = selected_columns[j].trim().to_string();
+
             if let Some(v) = trimmed_value.parse::<i64>().ok() {
                 hash_conditions.insert(column_condition.to_string(), Value::Integer(v));
             } else {
@@ -173,8 +204,8 @@ mod tests {
 
         // tesis is the invalid columns
         let columns = vec!["Edad".to_string(), "Tesis".to_string()];
-        let conditions = "WHERE name = 'John'";
-        let result = table.execute_select(columns, conditions);
+        let conditions = Some("WHERE name = 'John'");
+        let result = table.execute_select(columns, conditions, None);
         assert_eq!(result.is_err(), true);
     }
 }

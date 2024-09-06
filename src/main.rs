@@ -61,7 +61,9 @@ fn run(args: Vec<String>) -> Result<(), errors::TPErrors<'static>> {
             let command = Select::new();
 
             if !command.is_valid_query(consult) {
-                return Err(TPErrors::InvalidSyntax("Invalid select query"));
+                return Err(TPErrors::InvalidSyntax(
+                    "Invalid select query (Missing either SELECT , FROM or ;)",
+                ));
             }
 
             match extractor.extract_table(&consult) {
@@ -82,14 +84,6 @@ fn run(args: Vec<String>) -> Result<(), errors::TPErrors<'static>> {
                 }
             };
 
-            // to use later.
-            let conditions = match extractor.extract_as_str_conditions(&consult) {
-                Ok(conditions) => conditions,
-                Err(e) => {
-                    return Err(e);
-                }
-            };
-
             let columns = match extractor.extract_columns(consult) {
                 Ok(columns) => columns,
                 Err(e) => {
@@ -97,7 +91,19 @@ fn run(args: Vec<String>) -> Result<(), errors::TPErrors<'static>> {
                 }
             };
 
-            let csv_data = table.execute_select(columns, conditions);
+            // to use later.
+            let conditions = extractor.extract_as_str_conditions(&consult);
+
+            let sorting_vector = match extractor.extract_orderby_as_str(&consult) {
+                Some(sorting) => {
+                    println!("Sorting: [{}]", sorting);
+                    let vec_sort = extractor.parser_order_by_str(sorting);
+                    Some(vec_sort)
+                }
+                None => None,
+            };
+
+            let csv_data = table.execute_select(columns, conditions, None);
 
             match csv_data {
                 Ok(data) => {

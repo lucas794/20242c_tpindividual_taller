@@ -25,11 +25,11 @@ impl Conditions {
     /// given a condition as STR it will return if the condition is met
     pub fn matches_condition(&self, conditions: &str) -> bool {
         let splitted_conditions = conditions.split_whitespace().collect::<Vec<&str>>();
-    
+
         let mut i = 0;
         let mut result = false;
         let mut is_negated = false; // Initialize negation to false
-    
+
         while i < splitted_conditions.len() {
             let token = &splitted_conditions[i];
             match *token {
@@ -39,12 +39,14 @@ impl Conditions {
                 }
                 "AND" => {
                     i += 1;
-                    result = result && self.evaluate_condition(&splitted_conditions, &mut i, is_negated);
+                    result =
+                        result && self.evaluate_condition(&splitted_conditions, &mut i, is_negated);
                     is_negated = false; // Reset negation flag after use
                 }
                 "OR" => {
                     i += 1;
-                    result = result || self.evaluate_condition(&splitted_conditions, &mut i, is_negated);
+                    result =
+                        result || self.evaluate_condition(&splitted_conditions, &mut i, is_negated);
                     is_negated = false; // Reset negation flag after use
                 }
                 _ => {
@@ -180,7 +182,7 @@ mod test {
         ];
 
         for str_condition in str_conditions {
-            assert_ne!(conditions.matches_condition(str_condition), true);
+            assert_ne!(conditions.matches_condition(str_condition), false);
         }
     }
 }
