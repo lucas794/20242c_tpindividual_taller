@@ -2,6 +2,13 @@ use crate::errors::TPErrors;
 
 pub struct Extractor;
 
+pub enum SQLCommand {
+    SELECT,
+    INSERT,
+    UPDATE,
+    DELETE,
+}
+
 impl Extractor {
     pub fn new() -> Extractor {
         Extractor
@@ -11,33 +18,15 @@ impl Extractor {
     /// Example
     /// SELECT name, age FROM table;
     /// Returns ["name", "age"]
-    pub fn extract_columns<'a>(&self, query: &'a str) -> Result<Vec<String>, TPErrors<'static>> {
+    pub fn extract_columns_for_select<'a>(
+        &self,
+        query: &'a str,
+    ) -> Result<Vec<String>, TPErrors<'static>> {
         let query = query.trim();
 
         let where_pos = query.find("FROM");
 
-        let query_whiteplaced = query.split_whitespace().collect::<Vec<&str>>();
-        let start = match query_whiteplaced.first() {
-            Some(start) => {
-                match *start {
-                    "SELECT" => "SELECT".len(),
-                    "UPDATE" => "UPDATE".len(),
-                    "DELETE" => "DELETE".len(),
-                    "INSERT" => "INSERT INTO".len(),
-                    _ => {
-                        // at this point this should never happened because we checked it before.
-                        return Err(TPErrors::InvalidSyntax(
-                            "Invalid query (Missing SELECT, UPDATE, DELETE or INSERT INTO)",
-                        ));
-                    }
-                }
-            }
-            None => {
-                return Err(TPErrors::InvalidSyntax(
-                    "Invalid query (Missing SELECT, UPDATE, DELETE or INSERT INTO)",
-                ));
-            }
-        };
+        let start = "SELECT".len(); // at this point we know that the first element is SELECT since we validated before.
 
         match where_pos {
             Some(position_where) => {
@@ -61,14 +50,86 @@ impl Extractor {
         }
     }
 
+    pub fn extract_columns_and_values_for_insert<'a>(
+        &self,
+        query: &'a str,
+    ) -> Result<(Vec<String>, Vec<String>), TPErrors<'static>> {
+        let (start_columns, end_columns) = match (query.find("("), query.find(")")) {
+            (Some(start), Some(end)) => (start, end),
+            _ => {
+                return Err(TPErrors::InvalidSyntax(
+                    "Invalid INSERT query (Missing columns)",
+                ));
+            }
+        };
+
+        let (start_values, end_values) = match (query.rfind("("), query.rfind(")")) {
+            (Some(start), Some(end)) => (start, end),
+            _ => {
+                return Err(TPErrors::InvalidSyntax(
+                    "Invalid INSERT query (Missing values)",
+                ));
+            }
+        };
+
+        let columns_str = &query[start_columns + 1..end_columns];
+        let values_str = &query[start_values + 1..end_values];
+
+        // Parse the columns and values into vectors
+        let columns: Vec<String> = columns_str
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .collect();
+
+        let values: Vec<String> = values_str
+            .split(',')
+            .map(|s| {
+                let trimmed = s.trim();
+                if trimmed.is_empty() {
+                    "".to_string()
+                } else {
+                    trimmed.trim_matches('\'').to_string()
+                }
+            })
+            .collect();
+
+        // if len doesnt match we return an error
+        if columns.len() != values.len() {
+            return Err(TPErrors::InvalidSyntax(
+                "Invalid INSERT query (Columns and values do not match)",
+            ));
+        }
+
+        Ok((columns, values))
+    }
+
     /// Given a SQL Consult, we extract the table name as string.
     /// Example
     /// SELECT * FROM users WHERE id = 3;
     /// Returns "users"
-    pub fn extract_table<'a>(&self, query: &'a str) -> Result<&'a str, TPErrors<'static>> {
+    pub fn extract_table<'a>(
+        &self,
+        query: &'a str,
+        consult: SQLCommand,
+    ) -> Result<&'a str, TPErrors<'static>> {
         let query = query.trim();
 
-        let from_pos = query.find("FROM");
+        let (start, offset, end) = self.extract_positions(query, consult);
+
+        match (start, end) {
+            (0, 0) => {
+                return Err(TPErrors::InvalidSyntax(
+                    "Invalid query (Missing any KEY words on your consult)",
+                ));
+            }
+            _ => {
+                let table_data = &query[start + offset..end];
+                let table_data = table_data.trim();
+                Ok(table_data)
+            }
+        }
+
+        /*let from_pos = query.find("FROM");
         let where_or_end_consult_pos = query
             .find("WHERE")
             .or(query.find("ORDER"))
@@ -91,7 +152,73 @@ impl Extractor {
                     "Invalid select query (Missing FROM)",
                 ));
             }
-        }
+        }*/
+    }
+
+    /// Extracts the position from a QUERY to get the table name
+    /// Examples. SELECT * FROM users WHERE id = 3; -> gets FROM as start and WHERE as end, offset will be the length of FROM
+    /// INSERT INTO users (name, age) VALUES ('John', 20); -> gets INTO as start and ( as end, offset will be the length of INTO
+    /// UPDATE users SET name = 'John' WHERE id = 3; -> gets UPDATE as start and SET as end, offset will be the length of UPDATE
+    /// DELETE FROM users WHERE id = 3; -> gets DELETE as start and FROM as end, offset will be the length of DELETE
+    fn extract_positions<'a>(&self, query: &'a str, consult: SQLCommand) -> (usize, usize, usize) {
+        let query = query.trim();
+
+        let start = match consult {
+            SQLCommand::SELECT | SQLCommand::DELETE => match query.find("FROM") {
+                Some(pos) => pos,
+                None => 0,
+            },
+            SQLCommand::INSERT => match query.find("INTO") {
+                Some(pos) => pos,
+                None => 0,
+            },
+            SQLCommand::UPDATE => match query.find("UPDATE") {
+                Some(pos) => pos,
+                None => 0,
+            },
+        };
+
+        let offset = match consult {
+            SQLCommand::SELECT => "FROM".len(),
+            SQLCommand::INSERT => "INTO".len(),
+            SQLCommand::UPDATE => "UPDATE".len(),
+            SQLCommand::DELETE => "FROM".len(),
+        };
+
+        let end = match consult {
+            SQLCommand::SELECT => {
+                match query.find("WHERE") {
+                    // we need to find WHERE, ORDER or ;
+                    Some(pos) => pos,
+                    None => {
+                        // NO WHERE, so we need to find ORDER or ;
+                        match query.find("ORDER") {
+                            Some(pos) => pos,
+                            None => {
+                                // NO ORDER, so we need to find ;
+                                match query.find(";") {
+                                    Some(pos) => pos,
+                                    None => 0, // At this point, this should never happen since we checked before.
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            SQLCommand::INSERT => match query.find("(") {
+                Some(pos) => pos,
+                None => 0,
+            },
+            SQLCommand::UPDATE => match query.find("SET") {
+                Some(pos) => pos,
+                None => 0,
+            },
+            SQLCommand::DELETE => match query.find("WHERE") {
+                Some(pos) => pos,
+                None => query.find(";").unwrap(),
+            },
+        };
+        (start, offset, end)
     }
 
     /// Given a SQL Consult, we extract the conditions as string.
@@ -142,7 +269,7 @@ impl Extractor {
     /// Given a parsed ORDER by clause (previously filtered with extract_orderby_as_str)
     /// Returns a vector of tuples which contains the column to order and how
     /// True means its gonna be ASC, False means its gonna be DESC
-    pub fn parser_order_by_str(&self, str_orderby: &str) -> Vec<(String, bool)> {
+    pub fn parser_orderby_from_str_to_vec(&self, str_orderby: &str) -> Vec<(String, bool)> {
         str_orderby
             .split(',')
             .map(|part| {
@@ -162,12 +289,13 @@ impl Extractor {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
     #[test]
     fn extract_columns() {
         let extractor = Extractor::new();
         let consult: &str = "SELECT name, age FROM table;";
-        let columns = extractor.extract_columns(consult).unwrap();
+        let columns = extractor.extract_columns_for_select(consult).unwrap();
 
         assert_eq!(columns, vec!["name".to_string(), "age".to_string()]);
     }
@@ -185,7 +313,9 @@ mod tests {
         ]);
 
         for consult in consults {
-            let table = extractor.extract_table(consult).unwrap();
+            let table = extractor
+                .extract_table(consult, SQLCommand::SELECT)
+                .unwrap();
             assert_eq!(table, "table");
         }
     }
@@ -258,8 +388,80 @@ mod tests {
 
         for (i, q) in vec_query.iter().enumerate() {
             let orderby = extractor.extract_orderby_as_str(q).unwrap();
-            let vec_result = extractor.parser_order_by_str(orderby);
+            let vec_result = extractor.parser_orderby_from_str_to_vec(orderby);
             assert_eq!(vec_result, expected[i]);
         }
+    }
+
+    #[test]
+    fn extract_positions_of_extracting_table_matches() {
+        let extractor = Extractor::new();
+
+        let consults: Vec<&str> = Vec::from([
+            "SELECT * FROM users WHERE id = 3;",
+            "INSERT INTO users (name, age) VALUES ('John', 20);",
+            "UPDATE users SET name = 'John' WHERE id = 3;",
+            "DELETE FROM users WHERE id = 3;",
+        ]);
+
+        // tuples are in (start, offset, end)
+        // Example for the first consult
+        // FROM is at position 9, so start is 9
+        // FROM has a length of 4, so offset is 4
+        // WHERE is at position 20, so end is 20
+        let expected: Vec<(usize, usize, usize)> =
+            vec![(9, 4, 20), (7, 4, 18), (0, 6, 13), (7, 4, 18)];
+
+        let mut start;
+        let mut offset;
+        let mut end;
+        let i = 0;
+
+        (start, offset, end) = extractor.extract_positions(consults[i], SQLCommand::SELECT);
+        assert_eq!((start, offset, end), expected[i]);
+
+        (start, offset, end) = extractor.extract_positions(consults[i + 1], SQLCommand::INSERT);
+        assert_eq!((start, offset, end), expected[i + 1]);
+
+        (start, offset, end) = extractor.extract_positions(consults[i + 2], SQLCommand::UPDATE);
+        assert_eq!((start, offset, end), expected[i + 2]);
+
+        (start, offset, end) = extractor.extract_positions(consults[i + 3], SQLCommand::DELETE);
+        assert_eq!((start, offset, end), expected[i + 3]);
+    }
+
+    #[test]
+    fn extract_table_from_insert_into() {
+        let extractor = Extractor::new();
+
+        let consult: &str = "INSERT INTO users (name, age) VALUES ('John', 20);";
+        let table = extractor
+            .extract_table(consult, SQLCommand::INSERT)
+            .unwrap();
+        assert_eq!(table, "users");
+    }
+
+    #[test]
+    fn extract_columns_and_values_from_insert_into() {
+        let extractor = Extractor::new();
+
+        let consult = "INSERT INTO users (name, age) VALUES ('John', 20);";
+
+        let (columns, values) = extractor
+            .extract_columns_and_values_for_insert(consult)
+            .unwrap();
+
+        assert_eq!(columns, vec!["name".to_string(), "age".to_string()]);
+        assert_eq!(values, vec!["John".to_string(), "20".to_string()]);
+    }
+
+    #[test]
+    fn extract_columns_and_values_from_insert_into_doesnt_match_fails() {
+        let extractor = Extractor::new();
+
+        let consult = "INSERT INTO users (name, age) VALUES ('John', 20, 30);";
+
+        let result = extractor.extract_columns_and_values_for_insert(consult);
+        assert_eq!(result.is_err(), true);
     }
 }
