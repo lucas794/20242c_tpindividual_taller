@@ -2,7 +2,7 @@ use std::{
     cmp::Ordering,
     collections::HashMap,
     fs::File,
-    io::{BufRead, Seek, SeekFrom, Write},
+    io::{BufRead, BufReader, BufWriter, Seek, SeekFrom, Write},
 };
 
 use crate::{
@@ -22,7 +22,6 @@ impl<'a> Table<'a> {
         match file_reference {
             Ok(file) => Ok(Table { file, file_name }),
             Err(e) => {
-                println!("[INVALID_TABLE]: Error {}", e);
                 // lets throw error and stop the program
                 Err(std::io::Error::new(
                     std::io::ErrorKind::Other,
@@ -30,7 +29,14 @@ impl<'a> Table<'a> {
                 ))
             }
         }
+
+        // lets close the file
     }
+
+    pub fn get_file_directory(&self) -> &'a str {
+        self.file_name
+    }
+
     /// Get the file name of the table
     /// # Example
     /// ./path/table.csv -> table
@@ -248,8 +254,9 @@ impl<'a> Table<'a> {
         &mut self,
         columns: Vec<String>,
         values: Vec<String>,
-        opt_conditions: Option<&str>,
-    ) -> Result<Vec<Vec<String>>, std::io::Error> {
+        opt_conditions: Option<&str>)
+    //) -> Result<Vec<Vec<String>>, std::io::Error> {
+    -> Result<(), std::io::Error> {
         // we need to check if the columns are valid
         let columns_from_csv = std::io::BufReader::new(&self.file)
             .lines()
@@ -294,7 +301,59 @@ impl<'a> Table<'a> {
         // now we need to read the line and check if condition is met
         // if it is met, we need to change the values
         // and push it to the result
-        let mut result: Vec<Vec<String>> = Vec::new();
+
+        self.file.seek(SeekFrom::Start(0))?;
+
+        let mut temporal_file = BufWriter::new(File::create("./temp_file.csv")?);
+        temporal_file.write_all( columns_from_csv.split(",").collect::<Vec<&str>>().join(",").as_bytes())?;
+        temporal_file.write_all("\n".as_bytes())?;
+
+        for line in BufReader::new(&self.file).lines().into_iter().skip(1) {
+            let line = line?;
+            let splitted_line = line.split(",").map(|s| s).collect::<Vec<&str>>();
+
+            match opt_conditions {
+                Some(str_conditions) => {
+                    let splitted_columns_as_string = splitted_columns.iter().map(|s| s.to_string()).collect::<Vec<String>>();
+                    let (hashed_conditions, _) = self.extract_conditions(
+                        &index_all_columns,
+                        &splitted_line,
+                        &splitted_columns_as_string,
+                    );
+
+                    // lets see all keys and values
+                    let condition = Conditions::new(hashed_conditions);
+
+                    // lets see all keys and values
+                    if condition.matches_condition(str_conditions) {
+                        // criteria reached, we need to change the index 
+                        // of the columns according to the hash database with the proper value 
+                        let mut new_line = splitted_line.to_vec();
+                        for (i, value) in hash_changes.iter() {
+                            new_line[*i] = value;
+                        }
+                        // convert it as Vec<String
+ 
+                        temporal_file.write_all(new_line.join(",").as_bytes())?;
+                        temporal_file.write_all("\n".as_bytes())?;
+                    } else {
+                        temporal_file.write_all(splitted_line.join(",").as_bytes())?;
+                        temporal_file.write_all("\n".as_bytes())?;
+                    }
+                }
+                None => {
+                    // we need to change the values
+                    let mut new_line = splitted_line.to_vec();
+                    for (i, value) in hash_changes.iter() {
+                        new_line[*i] = value;
+                    }
+                    temporal_file.write_all(new_line.join(",").as_bytes())?;
+                    temporal_file.write_all("\n".as_bytes())?;
+                }
+            }
+        }
+        Ok(())
+        /*let mut result: Vec<Vec<String>> = Vec::new();
         self.file.seek(SeekFrom::Start(0))?;
 
         for line_read in std::io::BufReader::new(&self.file).lines().into_iter().skip(1) {
@@ -343,7 +402,7 @@ impl<'a> Table<'a> {
         let columns_from_csv = splitted_columns.iter().map(|s| s.to_string()).collect::<Vec<String>>();
         result.insert(0, columns_from_csv); // to prevent clone, at the end the columns at the top of the vector.
 
-        Ok(result)
+        Ok(result)*/
     }
 
     /// Given a index of columns, the columns and the splitted line

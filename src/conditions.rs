@@ -1,13 +1,26 @@
-use std::collections::HashMap;
+use core::fmt;
+use std::{collections::HashMap, fmt::{Display, Formatter}};
 
 // tried recursive descent parser but i lost so much time at this point.
 
+
 /// representation of the type of value can be used for conditions
+
+#[derive(Debug, PartialEq)]
 pub enum Value {
     /// For now we only support int & string.
     Integer(i64),
     String(String), // tried lifetime, hell no.
                     // pls dont ask for other type.
+}
+
+impl Display for Value {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            Value::Integer(i) => write!(f, "{}", i),
+            Value::String(s) => write!(f, "{}", s),
+        }
+    }
 }
 
 /// representation of the condition that can be used on a query

@@ -1,4 +1,4 @@
-use std::io::{self, Write};
+use std::{fs, io::{self, Write}};
 
 use crate::{errors::TPErrors, table::Table};
 
@@ -143,16 +143,45 @@ impl Update {
         let resolve = table.resolve_update(columns, values, conditions);
 
         match resolve {
-            Ok(data) => {
-                // lets write stdout
-                match table.write_csv(data) {
-                    Ok(_) => {
-                        return Ok(());
-                    }
+            Ok(_) => {
+                // we need to make a shift of files
+                // temporal file should be renamed to the original file name
+                // and the original file should be deleted
+                let file_directory = table.get_file_directory();
+
+                let file_name = match table.get_file_name() {
+                    Ok(file_name) => file_name,
                     Err(_) => {
-                        return Err(TPErrors::InvalidGeneric("Error while updating the table"));
+                        return Err(TPErrors::InvalidGeneric("Error getting the name of the file to update"));
+                    }
+                };
+                // lets close the file 
+
+                // we need to delete the original file
+                match fs::remove_file(file_directory) {
+                    Ok(_) => {}
+                    Err(_) => {
+                        return Err(TPErrors::InvalidGeneric("Error while deleting the original file"));
                     }
                 }
+                // the directory is until the last / is found
+                let pos_last_backlash = match file_directory.rfind('/') {
+                    Some(pos) => pos,
+                    None => {
+                        0
+                    }
+                };
+                
+                let temp_file_name = format!("{}/temp_file.csv", &file_directory[0..pos_last_backlash]);
+                let oficial_file_name = format!("{}/{}.csv", &file_directory[0..pos_last_backlash], file_name);
+                match fs::rename(&temp_file_name, &oficial_file_name) {
+                    Ok(_) => {}
+                    Err(_) => {
+                        return Err(TPErrors::InvalidGeneric("Error while renaming the temporal file"));
+                    }
+                }
+
+                return Ok(())
             }
             Err(_) => {
                 return Err(TPErrors::InvalidSyntax("Invalid columns inside the query"));

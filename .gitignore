@@ -1,2 +1,6 @@
-/target
-/target/*
+!/target/doc
+!/target/doc/*
+
+/target/debug
+/target/*.json
+/target/CACHEDIR.TAG
