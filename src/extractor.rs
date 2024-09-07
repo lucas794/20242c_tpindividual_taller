@@ -103,6 +103,48 @@ impl Extractor {
         Ok((columns, values))
     }
 
+    pub fn extract_columns_and_values_for_update<'a>(
+        &self,
+        query: &'a str,
+    ) -> Result<(Vec<String>, Vec<String>), TPErrors<'static>> {
+        let (start_columns, end_columns) = match (query.find("SET"), query.find("WHERE")) {
+            (Some(start), Some(end)) => (start, end),
+            _ => {
+                return Err(TPErrors::InvalidSyntax(
+                    "Invalid UPDATE query (Missing SET or WHERE)",
+                ));
+            }
+        };
+
+        let columns_str = &query[start_columns + "SET".len()..end_columns];
+        let columns_str = columns_str.trim();
+
+        let tmp_what_to_update: Vec<String> = columns_str
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .collect();
+
+        let mut columns: Vec<String> = Vec::new();
+        let mut values: Vec<String> = Vec::new();
+
+        // we need to split by , and = to get the columns and values
+        for what_to_update in tmp_what_to_update {
+            let what_to_update = what_to_update.trim();
+            let what_to_update = what_to_update.split('=').collect::<Vec<&str>>();
+
+            if what_to_update.len() != 2 {
+                return Err(TPErrors::InvalidSyntax("Invalid UPDATE query (Missing =)"));
+            }
+
+            let column = what_to_update[0].trim().to_string();
+            let value = what_to_update[1].trim().trim_matches('\'').to_string();
+
+            columns.push(column);
+            values.push(value);
+        }
+        Ok((columns, values))
+    }
+
     /// Given a SQL Consult, we extract the table name as string.
     /// Example
     /// SELECT * FROM users WHERE id = 3;
@@ -321,12 +363,13 @@ mod tests {
     }
 
     #[test]
-    fn conditions_query() {
+    fn conditions_multiple_query() {
         let extractor = Extractor::new();
 
         let vec_query: Vec<&str> = vec![
             "SELECT * FROM users WHERE id = 5 AND level = 10;",
             "SELECT * FROM users WHERE id = 5 AND level = 10 ORDER BY id;",
+            "UPDATE users SET name = 'John' WHERE id = 5 AND level = 10;",
         ];
 
         for q in vec_query {
@@ -463,5 +506,19 @@ mod tests {
 
         let result = extractor.extract_columns_and_values_for_insert(consult);
         assert_eq!(result.is_err(), true);
+    }
+
+    #[test]
+    fn extract_columns_and_values_for_update_matches() {
+        let extractor = Extractor::new();
+
+        let consult = "UPDATE users SET name = 'John', age = 20 WHERE id = 3;";
+
+        let (columns, values) = extractor
+            .extract_columns_and_values_for_update(consult)
+            .unwrap();
+
+        assert_eq!(columns, vec!["name".to_string(), "age".to_string()]);
+        assert_eq!(values, vec!["John".to_string(), "20".to_string()]);
     }
 }
