@@ -1,4 +1,7 @@
-use std::{fs, io::{self, Write}};
+use std::{
+    fs,
+    io::{self, Write},
+};
 
 use crate::{errors::TPErrors, table::Table};
 
@@ -152,36 +155,45 @@ impl Update {
                 let file_name = match table.get_file_name() {
                     Ok(file_name) => file_name,
                     Err(_) => {
-                        return Err(TPErrors::InvalidGeneric("Error getting the name of the file to update"));
+                        return Err(TPErrors::InvalidGeneric(
+                            "Error getting the name of the file to update",
+                        ));
                     }
                 };
-                // lets close the file 
+                // lets close the file
 
                 // we need to delete the original file
                 match fs::remove_file(file_directory) {
                     Ok(_) => {}
                     Err(_) => {
-                        return Err(TPErrors::InvalidGeneric("Error while deleting the original file"));
+                        return Err(TPErrors::InvalidGeneric(
+                            "Error while deleting the original file",
+                        ));
                     }
                 }
                 // the directory is until the last / is found
                 let pos_last_backlash = match file_directory.rfind('/') {
                     Some(pos) => pos,
-                    None => {
-                        0
-                    }
+                    None => 0,
                 };
-                
-                let temp_file_name = format!("{}/temp_file.csv", &file_directory[0..pos_last_backlash]);
-                let oficial_file_name = format!("{}/{}.csv", &file_directory[0..pos_last_backlash], file_name);
+
+                let temp_file_name =
+                    format!("{}/temp_file.csv", &file_directory[0..pos_last_backlash]);
+                let oficial_file_name = format!(
+                    "{}/{}.csv",
+                    &file_directory[0..pos_last_backlash],
+                    file_name
+                );
                 match fs::rename(&temp_file_name, &oficial_file_name) {
                     Ok(_) => {}
                     Err(_) => {
-                        return Err(TPErrors::InvalidGeneric("Error while renaming the temporal file"));
+                        return Err(TPErrors::InvalidGeneric(
+                            "Error while renaming the temporal file",
+                        ));
                     }
                 }
 
-                return Ok(())
+                return Ok(());
             }
             Err(_) => {
                 return Err(TPErrors::InvalidSyntax("Invalid columns inside the query"));
@@ -193,6 +205,82 @@ impl Update {
 impl Delete {
     pub fn new() -> Delete {
         Delete
+    }
+
+    pub fn is_valid_query<'a>(&self, query: &'a str) -> bool {
+        let query = query.trim();
+
+        if query.starts_with("DELETE") && query.contains("FROM") {
+            match query.chars().last() {
+                Some(';') => return true,
+                _ => return false,
+            }
+        }
+        false
+    }
+
+    pub fn execute_delete(
+        &self,
+        table: &mut Table,
+        conditions: Option<&str>,
+    ) -> Result<(), TPErrors> {
+        let resolve = table.resolve_delete(conditions);
+
+        match resolve {
+            Ok(_) => {
+                // we need to make a shift of files
+                // temporal file should be renamed to the original file name
+                // and the original file should be deleted
+                let file_directory = table.get_file_directory();
+
+                let file_name = match table.get_file_name() {
+                    Ok(file_name) => file_name,
+                    Err(_) => {
+                        return Err(TPErrors::InvalidGeneric(
+                            "Error getting the name of the file to update",
+                        ));
+                    }
+                };
+                // lets close the file
+
+                // we need to delete the original file
+                match fs::remove_file(file_directory) {
+                    Ok(_) => {}
+                    Err(_) => {
+                        return Err(TPErrors::InvalidGeneric(
+                            "Error while deleting the original file",
+                        ));
+                    }
+                }
+
+                // the directory is until the last / is found
+                let pos_last_backlash = match file_directory.rfind('/') {
+                    Some(pos) => pos,
+                    None => 0,
+                };
+
+                let temp_file_name =
+                    format!("{}/temp_file.csv", &file_directory[0..pos_last_backlash]);
+                let oficial_file_name = format!(
+                    "{}/{}.csv",
+                    &file_directory[0..pos_last_backlash],
+                    file_name
+                );
+                match fs::rename(&temp_file_name, &oficial_file_name) {
+                    Ok(_) => {}
+                    Err(_) => {
+                        return Err(TPErrors::InvalidGeneric(
+                            "Error while renaming the temporal file",
+                        ));
+                    }
+                }
+
+                return Ok(());
+            }
+            Err(_) => {
+                return Err(TPErrors::InvalidSyntax("Invalid columns inside the query"));
+            }
+        }
     }
 }
 
