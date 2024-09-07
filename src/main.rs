@@ -4,11 +4,9 @@ mod errors;
 mod extractor;
 mod table;
 
-use std::io::{self, Write};
-
-use consults::Select;
+use consults::{Insert, Select};
 use errors::TPErrors;
-use extractor::Extractor;
+use extractor::{Extractor, SQLCommand};
 use table::Table;
 
 fn main() {
@@ -58,15 +56,16 @@ fn run(args: Vec<String>) -> Result<(), errors::TPErrors<'static>> {
 
     match command {
         "SELECT" => {
-            let command = Select::new();
+            let select = Select::new();
 
-            if !command.is_valid_query(consult) {
+            if !select.is_valid_query(consult) {
                 return Err(TPErrors::InvalidSyntax(
                     "Invalid select query (Missing either SELECT , FROM or ;)",
                 ));
             }
 
-            match extractor.extract_table(&consult) {
+            // checking if its a valid table
+            match extractor.extract_table(&consult, SQLCommand::SELECT) {
                 Ok(table_name_from_query) => {
                     let table_name = match table.get_file_name() {
                         Ok(table_name) => table_name,
@@ -84,47 +83,76 @@ fn run(args: Vec<String>) -> Result<(), errors::TPErrors<'static>> {
                 }
             };
 
-            let columns = match extractor.extract_columns(consult) {
+            // lets get the columns selected from the query
+            let columns = match extractor.extract_columns_for_select(consult) {
                 Ok(columns) => columns,
                 Err(e) => {
                     return Err(e);
                 }
             };
 
-            // to use later.
+            // Conditions of the query (if they exists)
             let conditions = extractor.extract_as_str_conditions(&consult);
 
+            // Sorting method (if existst)
             let sorting_vector = match extractor.extract_orderby_as_str(&consult) {
                 Some(sorting) => {
-                    println!("Sorting: [{}]", sorting);
-                    let vec_sort = extractor.parser_order_by_str(sorting);
+                    let vec_sort = extractor.parser_orderby_from_str_to_vec(sorting);
                     Some(vec_sort)
                 }
                 None => None,
             };
 
-            let csv_data = table.execute_select(columns, conditions, None);
+            // lets execute the query
+            let result = select.execute_select(&mut table, columns, conditions, sorting_vector);
 
-            match csv_data {
-                Ok(data) => {
-                    // lets write stdout
-                    let stdout = io::stdout();
-
-                    let mut handle = io::BufWriter::new(stdout.lock());
-
-                    for line in data {
-                        let temp_line = line.join(",");
-                        handle.write(temp_line.as_bytes()).unwrap();
-                        handle.write(b"\n").unwrap();
-                    }
-                }
-                Err(_) => {
-                    return Err(TPErrors::InvalidSyntax("Invalid columns inside the query"));
-                }
+            if result.is_err() {
+                return Err(TPErrors::InvalidSyntax("Invalid columns inside the query"));
             }
+
+            return Ok(());
         }
         "INSERT" => {
-            println!("Insert command");
+            let insert = Insert::new();
+
+            if !insert.is_valid_query(consult) {
+                return Err(TPErrors::InvalidSyntax(
+                    "Invalid insert query (Missing either INSERT INTO, VALUES or ;)",
+                ));
+            }
+
+            let table_from_query = match extractor.extract_table(&consult, SQLCommand::INSERT) {
+                Ok(table_as_string) => table_as_string,
+                Err(e) => {
+                    return Err(e);
+                }
+            };
+
+            match table.get_file_name() {
+                Ok(table_name) => {
+                    if table_from_query != table_name {
+                        return Err(TPErrors::InvalidTable("Invalid table selected"));
+                    }
+                }
+                Err(e) => {
+                    return Err(e);
+                }
+            };
+
+            let (columns, values) = match extractor.extract_columns_and_values_for_insert(consult) {
+                Ok((columns, values)) => (columns, values),
+                Err(e) => {
+                    return Err(e);
+                }
+            };
+
+            let result = insert.execute_insert(&mut table, columns, values);
+
+            if result.is_err() {
+                return Err(TPErrors::InvalidSyntax("Invalid columns inside the query"));
+            }
+
+            return Ok(());
         }
         "UPDATE" => {
             println!("Update command");
