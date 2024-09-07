@@ -116,6 +116,49 @@ impl Update {
     pub fn new() -> Update {
         Update
     }
+
+    /// A valid UPDATE query contains UPDATE and SET AND ends with ;
+    /// if the query is valid, it will return true
+    /// UPDATE table_name SET column1 = value1, column2 = value2 WHERE condition;
+    /// UPDATE table_name SET column1 = value1, column2 = value2;
+    pub fn is_valid_query<'a>(&self, query: &'a str) -> bool {
+        let query = query.trim();
+
+        if query.starts_with("UPDATE") && query.contains("SET") {
+            match query.chars().last() {
+                Some(';') => return true,
+                _ => return false,
+            }
+        }
+        false
+    }
+
+    pub fn execute_update(
+        &self,
+        table: &mut Table,
+        columns: Vec<String>,
+        values: Vec<String>,
+        conditions: Option<&str>,
+    ) -> Result<(), TPErrors> {
+        let resolve = table.resolve_update(columns, values, conditions);
+
+        match resolve {
+            Ok(data) => {
+                // lets write stdout
+                match table.write_csv(data) {
+                    Ok(_) => {
+                        return Ok(());
+                    }
+                    Err(_) => {
+                        return Err(TPErrors::InvalidGeneric("Error while updating the table"));
+                    }
+                }
+            }
+            Err(_) => {
+                return Err(TPErrors::InvalidSyntax("Invalid columns inside the query"));
+            }
+        }
+    }
 }
 
 impl Delete {
