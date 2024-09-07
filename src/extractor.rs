@@ -474,14 +474,35 @@ mod tests {
     }
 
     #[test]
-    fn extract_table_from_insert_into() {
+    fn extract_table_from_multiple_consults_matchs() {
         let extractor = Extractor::new();
 
-        let consult: &str = "INSERT INTO users (name, age) VALUES ('John', 20);";
-        let table = extractor
-            .extract_table(consult, SQLCommand::INSERT)
+        let consult_select = "INSERT INTO users (name, age) VALUES ('John', 20);";
+        let consult_insert = "SELECT * FROM users WHERE id = 3;";
+        let consult_update = "UPDATE users SET name = 'John' WHERE id = 3;";
+        let consult_delete = "DELETE FROM users WHERE id = 3;";
+
+        let table_select = extractor
+            .extract_table(consult_select, SQLCommand::INSERT)
             .unwrap();
-        assert_eq!(table, "users");
+        assert_eq!(table_select, "users");
+
+        let table_insert = extractor
+            .extract_table(consult_insert, SQLCommand::SELECT)
+            .unwrap();
+
+        assert_eq!(table_insert, "users");
+
+        let table_update = extractor
+            .extract_table(consult_update, SQLCommand::UPDATE)
+            .unwrap();
+        assert_eq!(table_update, "users");
+
+        let table_delete = extractor
+            .extract_table(consult_delete, SQLCommand::DELETE)
+            .unwrap();
+
+        assert_eq!(table_delete, "users");
     }
 
     #[test]
