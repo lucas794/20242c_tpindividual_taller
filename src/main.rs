@@ -4,7 +4,7 @@ mod errors;
 mod extractor;
 mod table;
 
-use consults::{Insert, Select};
+use consults::{Insert, Select, Update};
 use errors::TPErrors;
 use extractor::{Extractor, SQLCommand};
 use table::Table;
@@ -155,7 +155,46 @@ fn run(args: Vec<String>) -> Result<(), errors::TPErrors<'static>> {
             return Ok(());
         }
         "UPDATE" => {
-            println!("Update command");
+            let update = Update::new();
+
+            if !update.is_valid_query(consult) {
+                return Err(TPErrors::InvalidSyntax(
+                    "Invalid update query (Missing either UPDATE, SET, WHERE or ;)",
+                ));
+            }
+
+            // checking if its a valid table
+            match extractor.extract_table(&consult, SQLCommand::UPDATE) {
+                Ok(table_name_from_query) => {
+                    let table_name = match table.get_file_name() {
+                        Ok(table_name) => table_name,
+                        Err(e) => {
+                            return Err(e);
+                        }
+                    };
+
+                    if table_name_from_query != table_name {
+                        return Err(TPErrors::InvalidTable("Invalid table selected"));
+                    }
+                }
+                Err(e) => {
+                    return Err(e);
+                }
+            };
+            let (columns, values) = match extractor.extract_columns_and_values_for_update(consult) {
+                Ok((columns, values)) => (columns, values),
+                Err(e) => {
+                    return Err(e);
+                }
+            };
+
+            let conditions = extractor.extract_as_str_conditions(&consult);
+
+            let result = update.execute_update(&mut table, columns, values, conditions);
+
+            if result.is_err() {
+                return Err(TPErrors::InvalidSyntax("Invalid columns inside the query"));
+            }
         }
         "DELETE" => {
             println!("Delete command");
