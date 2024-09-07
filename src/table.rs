@@ -1,8 +1,8 @@
-use core::hash;
 use std::{
+    cmp::Ordering,
     collections::HashMap,
     fs::File,
-    io::{BufRead, Seek},
+    io::{BufRead, Seek, Write},
 };
 
 use crate::{
@@ -56,9 +56,10 @@ impl<'a> Table<'a> {
         };
         Ok(table_name)
     }
+
     /// given the columns of the table, and the conditions of the query (as String)
     /// it will return the result of the query
-    pub fn execute_select(
+    pub fn resolve_select(
         &mut self,
         columns: Vec<String>,
         opt_conditions_as_str: Option<&str>,
@@ -131,17 +132,118 @@ impl<'a> Table<'a> {
                 }
             } else {
                 // we need to push the matched columns to the vector
-                let line_to_writte = index_columns
+                let line_to_write = index_columns
                     .iter()
                     .map(|i| splitted_line[*i])
                     .map(|s| s.to_string())
                     .collect::<Vec<String>>();
-                result.push(line_to_writte);
+                result.push(line_to_write);
             }
+        }
+
+        // lets sort the vector if we have a sorting method..
+        if let Some(sorting) = vector_sorting {
+            // first, let check if the columns are valid
+            let columns_from_query = sorting.iter().map(|(c, _)| c).collect::<Vec<&String>>();
+            if !columns_from_query.iter().all(|c| columns.contains(c)) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "Invalid columns inside the query",
+                ));
+            }
+
+            // now sorting the vector
+            result.sort_by(|a, b| {
+                for (column, asc) in &sorting {
+                    let index = columns.iter().position(|c| c == column).unwrap();
+                    let a_value = a[index].as_str();
+                    let b_value = b[index].as_str();
+
+                    let result = if a_value < b_value {
+                        Ordering::Less
+                    } else if a_value > b_value {
+                        Ordering::Greater
+                    } else {
+                        Ordering::Equal
+                    };
+
+                    if *asc {
+                        return result;
+                    } else {
+                        return result.reverse();
+                    }
+                }
+                Ordering::Equal
+            });
         }
         result.insert(0, columns); // to prevent clone, at the end the columns at the top of the vector.
 
         Ok(result)
+    }
+
+    /// given a columns as Vec<String> and values as Vec<String>
+    /// It returns the proper line to write in the csv
+    /// else returns a Error.
+    pub fn resolve_insert(
+        &self,
+        columns: Vec<String>,
+        values: Vec<String>,
+    ) -> Result<Vec<String>, std::io::Error> {
+        // we need to check if the columns are valid
+        let index_columns = std::io::BufReader::new(&self.file)
+            .lines()
+            .next()
+            .unwrap_or(Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Error reading file",
+            )))?;
+
+        let splitted_columns = index_columns.split(",").collect::<Vec<&str>>();
+
+        let temp_index = splitted_columns
+            .iter()
+            .enumerate()
+            .filter(|(_i, c)| columns.contains(&c.to_string()))
+            .map(|(i, _c)| i)
+            .collect::<Vec<usize>>();
+
+        // column len mismatch OR columns selected doesnt exist in the table
+        println!("Columns from query {:?} - len {}", columns, columns.len());
+        println!("Temp index {:?} - len {}", temp_index, temp_index.len());
+        println!("Splitted columns {:?}", splitted_columns);
+
+        if columns.len() != temp_index.len()
+            || columns
+                .iter()
+                .any(|c| !splitted_columns.contains(&c.as_str()))
+        {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Invalid columns",
+            ));
+        }
+
+        // now we need to each temp_index, writ the value
+        // else we write a empty string
+        let mut line_to_write: Vec<String> = Vec::new();
+        for (i, _col) in splitted_columns.iter().enumerate() {
+            if temp_index.contains(&i) {
+                let position = match temp_index.iter().position(|&x| x == i) {
+                    Some(p) => p,
+                    None => {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::Other,
+                            "Position not found",
+                        ));
+                    }
+                };
+                line_to_write.push(values[position].to_string());
+            } else {
+                line_to_write.push("".to_string());
+            }
+        }
+
+        Ok(line_to_write)
     }
 
     /// Given a index of columns, the columns and the splitted line
@@ -161,7 +263,6 @@ impl<'a> Table<'a> {
         // for each column, we need to map the condition
         let mut hash_conditions: HashMap<String, Value> = HashMap::new();
         for (j, _col) in selected_columns.iter().enumerate() {
-
             // with this we get the column that we want to check
             let column_condition = columns_from_query[j].as_str();
             // with this we get the value of the column
@@ -174,6 +275,16 @@ impl<'a> Table<'a> {
             }
         }
         (hash_conditions, selected_columns)
+    }
+
+    pub fn insert_line_to_csv(&mut self, line: String) -> Result<(), std::io::Error> {
+        // lets open the file name in append mode
+        let mut file = std::fs::OpenOptions::new()
+            .append(true)
+            .open(self.file_name)?;
+
+        file.write_all(line.as_bytes())?;
+        Ok(())
     }
 }
 
@@ -205,7 +316,25 @@ mod tests {
         // tesis is the invalid columns
         let columns = vec!["Edad".to_string(), "Tesis".to_string()];
         let conditions = Some("WHERE name = 'John'");
-        let result = table.execute_select(columns, conditions, None);
+        let result = table.resolve_select(columns, conditions, None);
+        assert_eq!(result.is_err(), true);
+    }
+
+    #[test]
+    fn invalid_column_when_sorting() {
+        let mut table = Table::new("./test.csv").unwrap();
+
+        // tesis is the invalid columns
+        let columns = vec!["Nombre".to_string(), "Edad".to_string()];
+
+        let conditions: Option<&str> = None;
+
+        let sorting = Some(vec![("Profesion".to_string(), true)]);
+
+        // at t his point, we have this consult.
+        // SELECT Nombre, Edad FROM test ORDER BY Profesion;
+        // so we are trying to sort by a column that does not exist
+        let result = table.resolve_select(columns, conditions, sorting);
         assert_eq!(result.is_err(), true);
     }
 }
