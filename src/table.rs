@@ -2,7 +2,7 @@ use std::{
     cmp::Ordering,
     collections::HashMap,
     fs::File,
-    io::{BufRead, Seek, Write},
+    io::{BufRead, Seek, SeekFrom, Write},
 };
 
 use crate::{
@@ -207,11 +207,6 @@ impl<'a> Table<'a> {
             .map(|(i, _c)| i)
             .collect::<Vec<usize>>();
 
-        // column len mismatch OR columns selected doesnt exist in the table
-        println!("Columns from query {:?} - len {}", columns, columns.len());
-        println!("Temp index {:?} - len {}", temp_index, temp_index.len());
-        println!("Splitted columns {:?}", splitted_columns);
-
         if columns.len() != temp_index.len()
             || columns
                 .iter()
@@ -244,6 +239,111 @@ impl<'a> Table<'a> {
         }
 
         Ok(line_to_write)
+    }
+
+    /// Function that handles the resolve of the update query
+    /// Given the columns to update, the values to update, and the conditions as str
+    /// it will return the result of the query
+    pub fn resolve_update(
+        &mut self,
+        columns: Vec<String>,
+        values: Vec<String>,
+        opt_conditions: Option<&str>,
+    ) -> Result<Vec<Vec<String>>, std::io::Error> {
+        // we need to check if the columns are valid
+        let columns_from_csv = std::io::BufReader::new(&self.file)
+            .lines()
+            .next()
+            .unwrap_or(Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Error reading file",
+            )))?;
+
+        let splitted_columns = columns_from_csv.split(",").collect::<Vec<&str>>();
+
+        let index_selected_column = splitted_columns
+            .iter()
+            .enumerate()
+            .filter(|(_i, c)| columns.contains(&c.to_string()))
+            .map(|(i, _c)| i)
+            .collect::<Vec<usize>>();
+    
+        let index_all_columns = (0..splitted_columns.len()).collect::<Vec<usize>>();
+
+        // we need to change the value of the columns
+        // we use a hash to store the new values
+        // and keys the index of the columns of change
+        // the change is done if the conditions are met
+        let mut hash_changes: HashMap<usize, String> = HashMap::new();
+
+        for (i, _col) in splitted_columns.iter().enumerate() {
+            if index_selected_column.contains(&i) {
+                let position = match index_selected_column.iter().position(|&x| x == i) {
+                    Some(p) => p,
+                    None => {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::Other,
+                            "Position not found",
+                        ));
+                    }
+                };
+                hash_changes.insert(i, values[position].to_string());
+            }
+        }
+
+        // now we need to read the line and check if condition is met
+        // if it is met, we need to change the values
+        // and push it to the result
+        let mut result: Vec<Vec<String>> = Vec::new();
+        self.file.seek(SeekFrom::Start(0))?;
+
+        for line_read in std::io::BufReader::new(&self.file).lines().into_iter().skip(1) {
+            let line = line_read?;
+            let splitted_line = line.split(",").map(|s| s).collect::<Vec<&str>>();
+
+            match opt_conditions {
+                Some(str_conditions) => {
+
+                    let splitted_columns_as_string = splitted_columns.iter().map(|s| s.to_string()).collect::<Vec<String>>();
+                    let (hashed_conditions, _) = self.extract_conditions(
+                        &index_all_columns,
+                        &splitted_line,
+                        &splitted_columns_as_string,
+                    );
+
+                    let condition = Conditions::new(hashed_conditions);
+
+                    // lets see all keys and values
+                    if condition.matches_condition(str_conditions) {
+                        // meet criteria reached, we need to change the index 
+                        // of the columns according to the hash database with the proper value 
+                        let mut new_line = splitted_line.to_vec();
+                        for (i, value) in hash_changes.iter() {
+                            new_line[*i] = value;
+                        }
+                        // convert it as Vec<String
+                        let corrected = new_line.iter().map(|s| s.to_string()).collect::<Vec<String>>();
+                        result.push(corrected);
+                    } else {
+                        result.push(splitted_line.iter().map(|s| s.to_string()).collect::<Vec<String>>()); // we convert it to string..
+                    }
+                }
+                None => {
+                    // we need to change the values
+                    let mut new_line = splitted_line.to_vec();
+                    for (i, value) in hash_changes.iter() {
+                        new_line[*i] = value;
+                    }
+                    result.push(new_line.iter().map(|s| s.to_string()).collect::<Vec<String>>()); // we convert it to string..
+                }
+            }
+        }
+
+        // lets convert the columns_from_csv to Vec<String>
+        let columns_from_csv = splitted_columns.iter().map(|s| s.to_string()).collect::<Vec<String>>();
+        result.insert(0, columns_from_csv); // to prevent clone, at the end the columns at the top of the vector.
+
+        Ok(result)
     }
 
     /// Given a index of columns, the columns and the splitted line
@@ -284,6 +384,20 @@ impl<'a> Table<'a> {
             .open(self.file_name)?;
 
         file.write_all(line.as_bytes())?;
+        Ok(())
+    }
+
+    pub fn write_csv(&mut self, data: Vec<Vec<String>>) -> Result<(), std::io::Error> {
+        // lets open the file name in write mode
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .open(self.file_name)?;
+
+        for line in data {
+            let mut line = line.join(",");
+            line.push_str("\n");
+            file.write_all(line.as_bytes())?;
+        }
         Ok(())
     }
 }
