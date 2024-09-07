@@ -511,6 +511,14 @@
 <a href="#511" id="511">511</a>
 <a href="#512" id="512">512</a>
 <a href="#513" id="513">513</a>
+<a href="#514" id="514">514</a>
+<a href="#515" id="515">515</a>
+<a href="#516" id="516">516</a>
+<a href="#517" id="517">517</a>
+<a href="#518" id="518">518</a>
+<a href="#519" id="519">519</a>
+<a href="#520" id="520">520</a>
+<a href="#521" id="521">521</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{
     cmp::Ordering,
     collections::HashMap,
@@ -534,7 +542,7 @@
 
         <span class="kw">match </span>file_reference {
             <span class="prelude-val">Ok</span>(file) =&gt; <span class="prelude-val">Ok</span>(Table { file, file_name }),
-            <span class="prelude-val">Err</span>(e) =&gt; {
+            <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
                 <span class="comment">// lets throw error and stop the program
                 </span><span class="prelude-val">Err</span>(std::io::Error::new(
                     std::io::ErrorKind::Other,
@@ -767,9 +775,8 @@
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         columns: Vec&lt;String&gt;,
         values: Vec&lt;String&gt;,
-        opt_conditions: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>str&gt;)
-    <span class="comment">//) -&gt; Result&lt;Vec&lt;Vec&lt;String&gt;&gt;, std::io::Error&gt; {
-    </span>-&gt; <span class="prelude-ty">Result</span>&lt;(), std::io::Error&gt; {
+        opt_conditions: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>str&gt;,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), std::io::Error&gt; {
         <span class="comment">// we need to check if the columns are valid
         </span><span class="kw">let </span>columns_from_csv = std::io::BufReader::new(<span class="kw-2">&amp;</span><span class="self">self</span>.file)
             .lines()
@@ -787,7 +794,7 @@
             .filter(|(_i, c)| columns.contains(<span class="kw-2">&amp;</span>c.to_string()))
             .map(|(i, _c)| i)
             .collect::&lt;Vec&lt;usize&gt;&gt;();
-    
+
         <span class="kw">let </span>index_all_columns = (<span class="number">0</span>..splitted_columns.len()).collect::&lt;Vec&lt;usize&gt;&gt;();
 
         <span class="comment">// we need to change the value of the columns
@@ -818,7 +825,13 @@
         </span><span class="self">self</span>.file.seek(SeekFrom::Start(<span class="number">0</span>))<span class="question-mark">?</span>;
 
         <span class="kw">let </span><span class="kw-2">mut </span>temporal_file = BufWriter::new(File::create(<span class="string">"./temp_file.csv"</span>)<span class="question-mark">?</span>);
-        temporal_file.write_all( columns_from_csv.split(<span class="string">","</span>).collect::&lt;Vec&lt;<span class="kw-2">&amp;</span>str&gt;&gt;().join(<span class="string">","</span>).as_bytes())<span class="question-mark">?</span>;
+        temporal_file.write_all(
+            columns_from_csv
+                .split(<span class="string">","</span>)
+                .collect::&lt;Vec&lt;<span class="kw-2">&amp;</span>str&gt;&gt;()
+                .join(<span class="string">","</span>)
+                .as_bytes(),
+        )<span class="question-mark">?</span>;
         temporal_file.write_all(<span class="string">"\n"</span>.as_bytes())<span class="question-mark">?</span>;
 
         <span class="kw">for </span>line <span class="kw">in </span>BufReader::new(<span class="kw-2">&amp;</span><span class="self">self</span>.file).lines().into_iter().skip(<span class="number">1</span>) {
@@ -827,26 +840,31 @@
 
             <span class="kw">match </span>opt_conditions {
                 <span class="prelude-val">Some</span>(str_conditions) =&gt; {
-                    <span class="kw">let </span>splitted_columns_as_string = splitted_columns.iter().map(|s| s.to_string()).collect::&lt;Vec&lt;String&gt;&gt;();
+                    <span class="kw">let </span>splitted_columns_as_string = splitted_columns
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect::&lt;Vec&lt;String&gt;&gt;();
                     <span class="kw">let </span>(hashed_conditions, <span class="kw">_</span>) = <span class="self">self</span>.extract_conditions(
                         <span class="kw-2">&amp;</span>index_all_columns,
                         <span class="kw-2">&amp;</span>splitted_line,
                         <span class="kw-2">&amp;</span>splitted_columns_as_string,
                     );
 
-                    <span class="comment">// lets see all keys and values
+                    <span class="comment">// lets print the conditions
+
+                    // lets see all keys and values
                     </span><span class="kw">let </span>condition = Conditions::new(hashed_conditions);
 
                     <span class="comment">// lets see all keys and values
                     </span><span class="kw">if </span>condition.matches_condition(str_conditions) {
-                        <span class="comment">// criteria reached, we need to change the index 
-                        // of the columns according to the hash database with the proper value 
+                        <span class="comment">// criteria reached, we need to change the index
+                        // of the columns according to the hash database with the proper value
                         </span><span class="kw">let </span><span class="kw-2">mut </span>new_line = splitted_line.to_vec();
                         <span class="kw">for </span>(i, value) <span class="kw">in </span>hash_changes.iter() {
                             new_line[<span class="kw-2">*</span>i] = value;
                         }
                         <span class="comment">// convert it as Vec&lt;String
- 
+
                         </span>temporal_file.write_all(new_line.join(<span class="string">","</span>).as_bytes())<span class="question-mark">?</span>;
                         temporal_file.write_all(<span class="string">"\n"</span>.as_bytes())<span class="question-mark">?</span>;
                     } <span class="kw">else </span>{
@@ -866,57 +884,7 @@
             }
         }
         <span class="prelude-val">Ok</span>(())
-        <span class="comment">/*let mut result: Vec&lt;Vec&lt;String&gt;&gt; = Vec::new();
-        self.file.seek(SeekFrom::Start(0))?;
-
-        for line_read in std::io::BufReader::new(&amp;self.file).lines().into_iter().skip(1) {
-            let line = line_read?;
-            let splitted_line = line.split(",").map(|s| s).collect::&lt;Vec&lt;&amp;str&gt;&gt;();
-
-            match opt_conditions {
-                Some(str_conditions) =&gt; {
-
-                    let splitted_columns_as_string = splitted_columns.iter().map(|s| s.to_string()).collect::&lt;Vec&lt;String&gt;&gt;();
-                    let (hashed_conditions, _) = self.extract_conditions(
-                        &amp;index_all_columns,
-                        &amp;splitted_line,
-                        &amp;splitted_columns_as_string,
-                    );
-
-                    let condition = Conditions::new(hashed_conditions);
-
-                    // lets see all keys and values
-                    if condition.matches_condition(str_conditions) {
-                        // meet criteria reached, we need to change the index 
-                        // of the columns according to the hash database with the proper value 
-                        let mut new_line = splitted_line.to_vec();
-                        for (i, value) in hash_changes.iter() {
-                            new_line[*i] = value;
-                        }
-                        // convert it as Vec&lt;String
-                        let corrected = new_line.iter().map(|s| s.to_string()).collect::&lt;Vec&lt;String&gt;&gt;();
-                        result.push(corrected);
-                    } else {
-                        result.push(splitted_line.iter().map(|s| s.to_string()).collect::&lt;Vec&lt;String&gt;&gt;()); // we convert it to string..
-                    }
-                }
-                None =&gt; {
-                    // we need to change the values
-                    let mut new_line = splitted_line.to_vec();
-                    for (i, value) in hash_changes.iter() {
-                        new_line[*i] = value;
-                    }
-                    result.push(new_line.iter().map(|s| s.to_string()).collect::&lt;Vec&lt;String&gt;&gt;()); // we convert it to string..
-                }
-            }
-        }
-
-        // lets convert the columns_from_csv to Vec&lt;String&gt;
-        let columns_from_csv = splitted_columns.iter().map(|s| s.to_string()).collect::&lt;Vec&lt;String&gt;&gt;();
-        result.insert(0, columns_from_csv); // to prevent clone, at the end the columns at the top of the vector.
-
-        Ok(result)*/
-    </span>}
+    }
 
     <span class="doccomment">/// Given a index of columns, the columns and the splitted line
     /// we return a hash of conditions AND the line itself.
@@ -925,28 +893,31 @@
         index_columns: <span class="kw-2">&amp;</span>Vec&lt;usize&gt;,
         splitted_line: <span class="kw-2">&amp;</span>Vec&lt;<span class="kw-2">&amp;</span>str&gt;,
         columns_from_query: <span class="kw-2">&amp;</span>Vec&lt;String&gt;,
-    ) -&gt; (HashMap&lt;String, Value&gt;, Vec&lt;String&gt;) {
+    ) -&gt; (Vec&lt;(String, Value)&gt;, Vec&lt;String&gt;) {
         <span class="kw">let </span>selected_columns = index_columns
             .iter()
             .map(|i| splitted_line[<span class="kw-2">*</span>i])
             .map(|s| s.to_string())
             .collect::&lt;Vec&lt;String&gt;&gt;();
 
+        <span class="kw">let </span><span class="kw-2">mut </span>vec_conditions: Vec&lt;(String, Value)&gt; = Vec::new();
+
         <span class="comment">// for each column, we need to map the condition
-        </span><span class="kw">let </span><span class="kw-2">mut </span>hash_conditions: HashMap&lt;String, Value&gt; = HashMap::new();
-        <span class="kw">for </span>(j, _col) <span class="kw">in </span>selected_columns.iter().enumerate() {
+        </span><span class="kw">for </span>(j, _col) <span class="kw">in </span>selected_columns.iter().enumerate() {
             <span class="comment">// with this we get the column that we want to check
             </span><span class="kw">let </span>column_condition = columns_from_query[j].as_str();
             <span class="comment">// with this we get the value of the column
             </span><span class="kw">let </span>trimmed_value = selected_columns[j].trim().to_string();
 
             <span class="kw">if let </span><span class="prelude-val">Some</span>(v) = trimmed_value.parse::&lt;i64&gt;().ok() {
-                hash_conditions.insert(column_condition.to_string(), Value::Integer(v));
-            } <span class="kw">else </span>{
-                hash_conditions.insert(column_condition.to_string(), Value::String(trimmed_value));
-            }
+                vec_conditions.push((column_condition.to_string(), Value::Integer(v)));
+                <span class="comment">//hash_conditions.insert(column_condition.to_string(), Value::Integer(v));
+            </span>} <span class="kw">else </span>{
+                vec_conditions.push((column_condition.to_string(), Value::String(trimmed_value)));
+                <span class="comment">//hash_conditions.insert(column_condition.to_string(), Value::String(trimmed_value));
+            </span>}
         }
-        (hash_conditions, selected_columns)
+        (vec_conditions, selected_columns)
     }
 
     <span class="kw">pub fn </span>insert_line_to_csv(<span class="kw-2">&amp;mut </span><span class="self">self</span>, line: String) -&gt; <span class="prelude-ty">Result</span>&lt;(), std::io::Error&gt; {
@@ -959,17 +930,62 @@
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="kw">pub fn </span>write_csv(<span class="kw-2">&amp;mut </span><span class="self">self</span>, data: Vec&lt;Vec&lt;String&gt;&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), std::io::Error&gt; {
-        <span class="comment">// lets open the file name in write mode
-        </span><span class="kw">let </span><span class="kw-2">mut </span>file = std::fs::OpenOptions::new()
-            .write(<span class="bool-val">true</span>)
-            .open(<span class="self">self</span>.file_name)<span class="question-mark">?</span>;
+    <span class="kw">pub fn </span>resolve_delete(<span class="kw-2">&amp;mut </span><span class="self">self</span>, conditions: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>str&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), std::io::Error&gt; {
+        <span class="comment">// we need to check if the conditions are met
+        // if they are met, we need to delete the line
+        // else we need to keep the line
+        // we need to write the lines that are not deleted in a temporal file
+        // and then rename the temporal file to the original file
+        // lets get the first line of the file to copy on the new file 
+        </span><span class="kw">let </span>columns_from_csv = std::io::BufReader::new(<span class="kw-2">&amp;</span><span class="self">self</span>.file)
+            .lines()
+            .next()
+            .unwrap_or(<span class="prelude-val">Err</span>(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                <span class="string">"Error reading file"</span>,
+            )))<span class="question-mark">?</span>;
 
-        <span class="kw">for </span>line <span class="kw">in </span>data {
-            <span class="kw">let </span><span class="kw-2">mut </span>line = line.join(<span class="string">","</span>);
-            line.push_str(<span class="string">"\n"</span>);
-            file.write_all(line.as_bytes())<span class="question-mark">?</span>;
+        <span class="self">self</span>.file.seek(SeekFrom::Start(<span class="number">0</span>))<span class="question-mark">?</span>;
+
+        <span class="kw">let </span><span class="kw-2">mut </span>temporal_file = BufWriter::new(File::create(<span class="string">"./temp_file.csv"</span>)<span class="question-mark">?</span>);
+        temporal_file.write_all(columns_from_csv.as_bytes())<span class="question-mark">?</span>;
+
+        <span class="kw">for </span>line <span class="kw">in </span>BufReader::new(<span class="kw-2">&amp;</span><span class="self">self</span>.file).lines().into_iter() {
+            <span class="kw">let </span>line = line<span class="question-mark">?</span>;
+            <span class="kw">let </span>splitted_line = line.split(<span class="string">","</span>).map(|s| s).collect::&lt;Vec&lt;<span class="kw-2">&amp;</span>str&gt;&gt;();
+
+            <span class="kw">match </span>conditions {
+                <span class="prelude-val">Some</span>(str_conditions) =&gt; {
+                    <span class="kw">let </span>splitted_columns = columns_from_csv.split(<span class="string">","</span>).collect::&lt;Vec&lt;<span class="kw-2">&amp;</span>str&gt;&gt;();
+                    <span class="kw">let </span>splitted_columns_as_string = splitted_columns
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect::&lt;Vec&lt;String&gt;&gt;();
+                    <span class="kw">let </span>(hashed_conditions, <span class="kw">_</span>) = <span class="self">self</span>.extract_conditions(
+                        <span class="kw-2">&amp;</span>(<span class="number">0</span>..splitted_columns.len()).collect::&lt;Vec&lt;usize&gt;&gt;(),
+                        <span class="kw-2">&amp;</span>splitted_line,
+                        <span class="kw-2">&amp;</span>splitted_columns_as_string,
+                    );
+
+                    <span class="comment">// lets print the conditions
+
+                    // lets see all keys and values
+                    </span><span class="kw">let </span>condition = Conditions::new(hashed_conditions);
+
+                    <span class="comment">// lets see all keys and values
+                    </span><span class="kw">if </span>!condition.matches_condition(str_conditions) {
+                        <span class="comment">// criteria reached, we need to change the index
+                        // of the columns according to the hash database with the proper value
+                        </span>temporal_file.write_all(line.as_bytes())<span class="question-mark">?</span>;
+                        temporal_file.write_all(<span class="string">"\n"</span>.as_bytes())<span class="question-mark">?</span>;
+                    }
+                }
+                <span class="prelude-val">None </span>=&gt; {
+                    <span class="comment">// we do basically nothing
+                </span>}
+            }
         }
+
         <span class="prelude-val">Ok</span>(())
     }
 }

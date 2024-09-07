@@ -4,7 +4,7 @@ mod errors;
 mod extractor;
 mod table;
 
-use consults::{Insert, Select, Update};
+use consults::*;
 use errors::TPErrors;
 use extractor::{Extractor, SQLCommand};
 use table::Table;
@@ -197,7 +197,40 @@ fn run(args: Vec<String>) -> Result<(), errors::TPErrors<'static>> {
             }
         }
         "DELETE" => {
-            println!("Delete command");
+            let delete = Delete::new();
+
+            if !delete.is_valid_query(consult) {
+                return Err(TPErrors::InvalidSyntax(
+                    "Invalid delete query (Missing either DELETE, FROM or ;)",
+                ));
+            }
+
+            // checking if its a valid table
+            match extractor.extract_table(&consult, SQLCommand::DELETE) {
+                Ok(table_name_from_query) => {
+                    let table_name = match table.get_file_name() {
+                        Ok(table_name) => table_name,
+                        Err(e) => {
+                            return Err(e);
+                        }
+                    };
+
+                    if table_name_from_query != table_name {
+                        return Err(TPErrors::InvalidTable("Invalid table selected"));
+                    }
+                }
+                Err(e) => {
+                    return Err(e);
+                }
+            };
+
+            let conditions = extractor.extract_as_str_conditions(&consult);
+
+            let result = delete.execute_delete(&mut table, conditions);
+
+            if result.is_err() {
+                //return Err(TPErrors::InvalidSyntax("Invalid columns inside the query"));
+            }
         }
         _ => {
             return Err(TPErrors::InvalidSyntax("Invalid command"));

@@ -21,7 +21,7 @@ impl<'a> Table<'a> {
 
         match file_reference {
             Ok(file) => Ok(Table { file, file_name }),
-            Err(e) => {
+            Err(_) => {
                 // lets throw error and stop the program
                 Err(std::io::Error::new(
                     std::io::ErrorKind::Other,
@@ -254,9 +254,8 @@ impl<'a> Table<'a> {
         &mut self,
         columns: Vec<String>,
         values: Vec<String>,
-        opt_conditions: Option<&str>)
-    //) -> Result<Vec<Vec<String>>, std::io::Error> {
-    -> Result<(), std::io::Error> {
+        opt_conditions: Option<&str>,
+    ) -> Result<(), std::io::Error> {
         // we need to check if the columns are valid
         let columns_from_csv = std::io::BufReader::new(&self.file)
             .lines()
@@ -274,7 +273,7 @@ impl<'a> Table<'a> {
             .filter(|(_i, c)| columns.contains(&c.to_string()))
             .map(|(i, _c)| i)
             .collect::<Vec<usize>>();
-    
+
         let index_all_columns = (0..splitted_columns.len()).collect::<Vec<usize>>();
 
         // we need to change the value of the columns
@@ -305,7 +304,13 @@ impl<'a> Table<'a> {
         self.file.seek(SeekFrom::Start(0))?;
 
         let mut temporal_file = BufWriter::new(File::create("./temp_file.csv")?);
-        temporal_file.write_all( columns_from_csv.split(",").collect::<Vec<&str>>().join(",").as_bytes())?;
+        temporal_file.write_all(
+            columns_from_csv
+                .split(",")
+                .collect::<Vec<&str>>()
+                .join(",")
+                .as_bytes(),
+        )?;
         temporal_file.write_all("\n".as_bytes())?;
 
         for line in BufReader::new(&self.file).lines().into_iter().skip(1) {
@@ -314,26 +319,31 @@ impl<'a> Table<'a> {
 
             match opt_conditions {
                 Some(str_conditions) => {
-                    let splitted_columns_as_string = splitted_columns.iter().map(|s| s.to_string()).collect::<Vec<String>>();
+                    let splitted_columns_as_string = splitted_columns
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect::<Vec<String>>();
                     let (hashed_conditions, _) = self.extract_conditions(
                         &index_all_columns,
                         &splitted_line,
                         &splitted_columns_as_string,
                     );
 
+                    // lets print the conditions
+
                     // lets see all keys and values
                     let condition = Conditions::new(hashed_conditions);
 
                     // lets see all keys and values
                     if condition.matches_condition(str_conditions) {
-                        // criteria reached, we need to change the index 
-                        // of the columns according to the hash database with the proper value 
+                        // criteria reached, we need to change the index
+                        // of the columns according to the hash database with the proper value
                         let mut new_line = splitted_line.to_vec();
                         for (i, value) in hash_changes.iter() {
                             new_line[*i] = value;
                         }
                         // convert it as Vec<String
- 
+
                         temporal_file.write_all(new_line.join(",").as_bytes())?;
                         temporal_file.write_all("\n".as_bytes())?;
                     } else {
@@ -353,56 +363,6 @@ impl<'a> Table<'a> {
             }
         }
         Ok(())
-        /*let mut result: Vec<Vec<String>> = Vec::new();
-        self.file.seek(SeekFrom::Start(0))?;
-
-        for line_read in std::io::BufReader::new(&self.file).lines().into_iter().skip(1) {
-            let line = line_read?;
-            let splitted_line = line.split(",").map(|s| s).collect::<Vec<&str>>();
-
-            match opt_conditions {
-                Some(str_conditions) => {
-
-                    let splitted_columns_as_string = splitted_columns.iter().map(|s| s.to_string()).collect::<Vec<String>>();
-                    let (hashed_conditions, _) = self.extract_conditions(
-                        &index_all_columns,
-                        &splitted_line,
-                        &splitted_columns_as_string,
-                    );
-
-                    let condition = Conditions::new(hashed_conditions);
-
-                    // lets see all keys and values
-                    if condition.matches_condition(str_conditions) {
-                        // meet criteria reached, we need to change the index 
-                        // of the columns according to the hash database with the proper value 
-                        let mut new_line = splitted_line.to_vec();
-                        for (i, value) in hash_changes.iter() {
-                            new_line[*i] = value;
-                        }
-                        // convert it as Vec<String
-                        let corrected = new_line.iter().map(|s| s.to_string()).collect::<Vec<String>>();
-                        result.push(corrected);
-                    } else {
-                        result.push(splitted_line.iter().map(|s| s.to_string()).collect::<Vec<String>>()); // we convert it to string..
-                    }
-                }
-                None => {
-                    // we need to change the values
-                    let mut new_line = splitted_line.to_vec();
-                    for (i, value) in hash_changes.iter() {
-                        new_line[*i] = value;
-                    }
-                    result.push(new_line.iter().map(|s| s.to_string()).collect::<Vec<String>>()); // we convert it to string..
-                }
-            }
-        }
-
-        // lets convert the columns_from_csv to Vec<String>
-        let columns_from_csv = splitted_columns.iter().map(|s| s.to_string()).collect::<Vec<String>>();
-        result.insert(0, columns_from_csv); // to prevent clone, at the end the columns at the top of the vector.
-
-        Ok(result)*/
     }
 
     /// Given a index of columns, the columns and the splitted line
@@ -412,15 +372,16 @@ impl<'a> Table<'a> {
         index_columns: &Vec<usize>,
         splitted_line: &Vec<&str>,
         columns_from_query: &Vec<String>,
-    ) -> (HashMap<String, Value>, Vec<String>) {
+    ) -> (Vec<(String, Value)>, Vec<String>) {
         let selected_columns = index_columns
             .iter()
             .map(|i| splitted_line[*i])
             .map(|s| s.to_string())
             .collect::<Vec<String>>();
 
+        let mut vec_conditions: Vec<(String, Value)> = Vec::new();
+
         // for each column, we need to map the condition
-        let mut hash_conditions: HashMap<String, Value> = HashMap::new();
         for (j, _col) in selected_columns.iter().enumerate() {
             // with this we get the column that we want to check
             let column_condition = columns_from_query[j].as_str();
@@ -428,12 +389,14 @@ impl<'a> Table<'a> {
             let trimmed_value = selected_columns[j].trim().to_string();
 
             if let Some(v) = trimmed_value.parse::<i64>().ok() {
-                hash_conditions.insert(column_condition.to_string(), Value::Integer(v));
+                vec_conditions.push((column_condition.to_string(), Value::Integer(v)));
+                //hash_conditions.insert(column_condition.to_string(), Value::Integer(v));
             } else {
-                hash_conditions.insert(column_condition.to_string(), Value::String(trimmed_value));
+                vec_conditions.push((column_condition.to_string(), Value::String(trimmed_value)));
+                //hash_conditions.insert(column_condition.to_string(), Value::String(trimmed_value));
             }
         }
-        (hash_conditions, selected_columns)
+        (vec_conditions, selected_columns)
     }
 
     pub fn insert_line_to_csv(&mut self, line: String) -> Result<(), std::io::Error> {
@@ -446,17 +409,62 @@ impl<'a> Table<'a> {
         Ok(())
     }
 
-    pub fn write_csv(&mut self, data: Vec<Vec<String>>) -> Result<(), std::io::Error> {
-        // lets open the file name in write mode
-        let mut file = std::fs::OpenOptions::new()
-            .write(true)
-            .open(self.file_name)?;
+    pub fn resolve_delete(&mut self, conditions: Option<&str>) -> Result<(), std::io::Error> {
+        // we need to check if the conditions are met
+        // if they are met, we need to delete the line
+        // else we need to keep the line
+        // we need to write the lines that are not deleted in a temporal file
+        // and then rename the temporal file to the original file
+        // lets get the first line of the file to copy on the new file
+        let columns_from_csv = std::io::BufReader::new(&self.file)
+            .lines()
+            .next()
+            .unwrap_or(Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Error reading file",
+            )))?;
 
-        for line in data {
-            let mut line = line.join(",");
-            line.push_str("\n");
-            file.write_all(line.as_bytes())?;
+        self.file.seek(SeekFrom::Start(0))?;
+
+        let mut temporal_file = BufWriter::new(File::create("./temp_file.csv")?);
+        temporal_file.write_all(columns_from_csv.as_bytes())?;
+
+        for line in BufReader::new(&self.file).lines().into_iter() {
+            let line = line?;
+            let splitted_line = line.split(",").map(|s| s).collect::<Vec<&str>>();
+
+            match conditions {
+                Some(str_conditions) => {
+                    let splitted_columns = columns_from_csv.split(",").collect::<Vec<&str>>();
+                    let splitted_columns_as_string = splitted_columns
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect::<Vec<String>>();
+                    let (hashed_conditions, _) = self.extract_conditions(
+                        &(0..splitted_columns.len()).collect::<Vec<usize>>(),
+                        &splitted_line,
+                        &splitted_columns_as_string,
+                    );
+
+                    // lets print the conditions
+
+                    // lets see all keys and values
+                    let condition = Conditions::new(hashed_conditions);
+
+                    // lets see all keys and values
+                    if !condition.matches_condition(str_conditions) {
+                        // criteria reached, we need to change the index
+                        // of the columns according to the hash database with the proper value
+                        temporal_file.write_all(line.as_bytes())?;
+                        temporal_file.write_all("\n".as_bytes())?;
+                    }
+                }
+                None => {
+                    // we do basically nothing
+                }
+            }
         }
+
         Ok(())
     }
 }
