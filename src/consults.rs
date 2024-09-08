@@ -1,7 +1,4 @@
-use std::{
-    fs,
-    io::{self, Write},
-};
+use std::fs;
 
 use crate::{errors::TPErrors, table::Table};
 
@@ -69,14 +66,14 @@ impl Select {
         match csv_data {
             Ok(data) => {
                 // lets write stdout
-                let stdout = io::stdout();
+                /*let stdout = io::stdout();
 
-                let mut handle = io::BufWriter::new(stdout.lock());
+                let mut handle = io::BufWriter::new(stdout.lock());*/
 
                 for line in data {
-                    let mut temp_line = line.join(",");
-                    temp_line.push('\n');
-                    let _ = handle.write(temp_line.as_bytes());
+                    let temp_line = line.join(",");
+                    println!("{}", temp_line);
+                    //let _ = handle.write(temp_line.as_bytes());
                 }
                 Ok(())
             }

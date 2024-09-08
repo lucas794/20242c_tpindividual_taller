@@ -586,7 +586,7 @@
         <span class="comment">// Parse the columns and values into vectors
         </span><span class="kw">let </span>columns: Vec&lt;String&gt; = columns_str
             .split(<span class="string">','</span>)
-            .map(|s| s.trim().to_string())
+            .map(|s| s.trim_matches(<span class="string">'\''</span>).trim().to_string())
             .collect();
 
         <span class="kw">let </span>values: Vec&lt;String&gt; = values_str
@@ -596,7 +596,7 @@
                 <span class="kw">if </span>trimmed.is_empty() {
                     <span class="string">""</span>.to_string()
                 } <span class="kw">else </span>{
-                    trimmed.trim_matches(<span class="string">'\''</span>).to_string()
+                    trimmed.trim_matches(<span class="string">'\''</span>).trim().to_string()
                 }
             })
             .collect();
@@ -720,16 +720,16 @@
                 }
             }
             SQLCommand::Insert =&gt; {
-                query.find(<span class="string">"("</span>).unwrap_or(<span class="number">0</span>)
-                <span class="comment">/*let possible_end = query.find("(").unwrap_or(0);
-                let values_start = query.find("VALUES").unwrap_or(0);
+                <span class="comment">//query.find("(").unwrap_or(0)
+                </span><span class="kw">let </span>possible_end = query.find(<span class="string">"("</span>).unwrap_or(<span class="number">0</span>);
+                <span class="kw">let </span>values_start = query.find(<span class="string">"VALUES"</span>).unwrap_or(<span class="number">0</span>);
 
-                if possible_end &lt; values_start {
+                <span class="kw">if </span>possible_end &lt; values_start {
                     possible_end
-                } else {
+                } <span class="kw">else </span>{
                     values_start
-                }*/
-            </span>}
+                }
+            }
             SQLCommand::Update =&gt; query.find(<span class="string">"SET"</span>).unwrap_or(<span class="number">0</span>),
             SQLCommand::Delete =&gt; <span class="kw">match </span>query.find(<span class="string">"WHERE"</span>) {
                 <span class="prelude-val">Some</span>(pos) =&gt; pos,

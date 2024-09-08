@@ -557,6 +557,11 @@
 <a href="#557" id="557">557</a>
 <a href="#558" id="558">558</a>
 <a href="#559" id="559">559</a>
+<a href="#560" id="560">560</a>
+<a href="#561" id="561">561</a>
+<a href="#562" id="562">562</a>
+<a href="#563" id="563">563</a>
+<a href="#564" id="564">564</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{
     cmp::Ordering,
     collections::HashMap,
@@ -771,19 +776,21 @@
 
         <span class="kw">let </span>splitted_columns = index_columns.split(<span class="string">","</span>).collect::&lt;Vec&lt;<span class="kw-2">&amp;</span>str&gt;&gt;();
 
-        <span class="kw">let </span>temp_index = splitted_columns
-            .iter()
-            .enumerate()
-            .filter(|(_i, c)| columns.contains(<span class="kw-2">&amp;</span>c.to_string()))
-            .map(|(i, _c)| i)
-            .collect::&lt;Vec&lt;usize&gt;&gt;();
-
-        <span class="kw">let </span>bool_missing_table = columns
-            .iter()
-            .any(|c| !splitted_columns.contains(<span class="kw-2">&amp;</span>c.as_str()));
+        <span class="comment">// if the column IS the same as values, this means that the columns weren't send on the query.
+        </span><span class="kw">let </span>temp_index = <span class="kw">if </span>columns != values {
+            splitted_columns
+                .iter()
+                .enumerate()
+                .filter(|(_i, c)| columns.contains(<span class="kw-2">&amp;</span>c.to_string()))
+                .map(|(i, _c)| i)
+                .collect::&lt;Vec&lt;usize&gt;&gt;()
+        } <span class="kw">else </span>{
+            (<span class="number">0</span>..splitted_columns.len()).collect::&lt;Vec&lt;usize&gt;&gt;()
+        };
 
         <span class="comment">// columns != temp_index OR the table doesn't exist in the csv file.
-        </span><span class="kw">if </span>columns.len() != temp_index.len() || bool_missing_table {
+        </span><span class="kw">if </span>columns.len() != temp_index.len() {
+            <span class="macro">println!</span>(<span class="string">"This is failing"</span>);
             <span class="kw">return </span><span class="prelude-val">Err</span>(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 <span class="string">"Invalid columns"</span>,
@@ -992,7 +999,10 @@
 
         <span class="self">self</span>.file.seek(SeekFrom::Start(<span class="number">0</span>))<span class="question-mark">?</span>;
 
-        <span class="kw">let </span><span class="kw-2">mut </span>temporal_file = BufWriter::new(File::create(<span class="string">"./temp_file.csv"</span>)<span class="question-mark">?</span>);
+        <span class="kw">let </span>formal_path = <span class="macro">format!</span>(<span class="string">"{}/temporal_file.csv"</span>, <span class="self">self</span>.get_directory_where_file_is());
+
+        <span class="kw">let </span><span class="kw-2">mut </span>temporal_file = BufWriter::new(File::create(formal_path)<span class="question-mark">?</span>);
+
         temporal_file.write_all(columns_from_csv.as_bytes())<span class="question-mark">?</span>;
 
         <span class="kw">for </span>line <span class="kw">in </span>BufReader::new(<span class="kw-2">&amp;</span><span class="self">self</span>.file).lines() {

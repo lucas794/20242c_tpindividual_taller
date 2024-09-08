@@ -213,13 +213,13 @@ impl<'a> Table<'a> {
         let splitted_columns = index_columns.split(",").collect::<Vec<&str>>();
 
         // if the column IS the same as values, this means that the columns weren't send on the query.
-        let temp_index = if columns != values { 
+        let temp_index = if columns != values {
             splitted_columns
-            .iter()
-            .enumerate()
-            .filter(|(_i, c)| columns.contains(&c.to_string()))
-            .map(|(i, _c)| i)
-            .collect::<Vec<usize>>()
+                .iter()
+                .enumerate()
+                .filter(|(_i, c)| columns.contains(&c.to_string()))
+                .map(|(i, _c)| i)
+                .collect::<Vec<usize>>()
         } else {
             (0..splitted_columns.len()).collect::<Vec<usize>>()
         };
@@ -438,7 +438,7 @@ impl<'a> Table<'a> {
         let formal_path = format!("{}/temporal_file.csv", self.get_directory_where_file_is());
 
         let mut temporal_file = BufWriter::new(File::create(formal_path)?);
-        
+
         temporal_file.write_all(columns_from_csv.as_bytes())?;
 
         for line in BufReader::new(&self.file).lines() {
