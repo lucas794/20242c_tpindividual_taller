@@ -2,17 +2,17 @@ use std::fmt::{Display, Formatter, Result};
 
 #[derive(Debug)]
 pub enum TPErrors<'a> {
-    InvalidTable(&'a str),
-    InvalidSyntax(&'a str),
-    InvalidGeneric(&'a str),
+    Table(&'a str),
+    Syntax(&'a str),
+    Generic(&'a str),
 }
 
 impl<'a> Display for TPErrors<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            TPErrors::InvalidGeneric(e) => write!(f, "[ERROR] {}", *e),
-            TPErrors::InvalidTable(e) => write!(f, "[INVALID_TABLE]: {}", *e),
-            TPErrors::InvalidSyntax(e) => write!(f, "[INVALID_SYNTAX]: {}", *e),
+            TPErrors::Generic(e) => write!(f, "[ERROR] {}", *e),
+            TPErrors::Table(e) => write!(f, "[INVALID_TABLE]: {}", *e),
+            TPErrors::Syntax(e) => write!(f, "[INVALID_SYNTAX]: {}", *e),
         }
     }
 }

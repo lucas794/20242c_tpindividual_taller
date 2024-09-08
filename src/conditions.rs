@@ -1,5 +1,6 @@
 // tried recursive descent parser but i lost so much time at this point.
 /// representation of the type of value can be used for conditions
+
 pub enum Value {
     /// For now we only support int & string.
     Integer(i64),
@@ -46,7 +47,7 @@ impl Conditions {
                         result || self.evaluate_condition(&splitted_conditions, &mut i, is_negated);
                     is_negated = false; // Reset negation flag after use
 
-                    if result == true {
+                    if result {
                         // a single true in OR is enough
                         return true;
                     }
@@ -61,22 +62,23 @@ impl Conditions {
     }
 
     /// given a condition, it will evaluate if the condition is met
-    pub fn evaluate_condition(&self, conditions: &Vec<&str>, i: &mut usize, negate: bool) -> bool {
+    pub fn evaluate_condition(&self, conditions: &[&str], i: &mut usize, negate: bool) -> bool {
         if *i + 2 >= conditions.len() {
             return false; // Avoid out-of-bounds access
         }
 
-        let column = &conditions[*i];
+        let column = &conditions[*i].trim_matches('\'');
         let operator = &conditions[*i + 1];
-        let value = &conditions[*i + 2];
+        let value = &conditions[*i + 2].trim_matches('\'');
+
         *i += 3; // Advance the index
 
         // Find the actual value of the column from the record
         let found_column = self.data.iter().find(|(col, _)| col == column);
         if let Some((_, actual_value)) = found_column {
             let condition_met = match (actual_value, *operator) {
-                (Value::String(actual), "=") => actual == &value.trim_matches('\''),
-                (Value::String(actual), "!=") => actual != &value.trim_matches('\''),
+                (Value::String(actual), "=") => actual == value.trim_matches('\''),
+                (Value::String(actual), "!=") => actual != value.trim_matches('\''),
                 (Value::Integer(actual), "=") => {
                     if let Ok(val) = value.parse::<i64>() {
                         actual == &val

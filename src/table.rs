@@ -45,7 +45,7 @@ impl<'a> Table<'a> {
         let table_file = match self.file_name.split("/").last() {
             Some(name) => name,
             None => {
-                return Err(TPErrors::InvalidGeneric(
+                return Err(TPErrors::Generic(
                     "Error getting table file name by unknown reason",
                 ));
             }
@@ -55,7 +55,7 @@ impl<'a> Table<'a> {
         let table_name = match table_file.split(".").next() {
             Some(name) => name,
             None => {
-                return Err(TPErrors::InvalidGeneric(
+                return Err(TPErrors::Generic(
                     "Error getting table name, splitting by '.' failed",
                 ));
             }
@@ -122,7 +122,7 @@ impl<'a> Table<'a> {
 
         for line_read in std::io::BufReader::new(&self.file).lines().skip(1) {
             let line = line_read?;
-            let splitted_line = line.split(",").map(|s| s).collect::<Vec<&str>>();
+            let splitted_line = line.split(",").collect::<Vec<&str>>();
 
             if opt_conditions_as_str.is_some() {
                 // we have conditions to check
@@ -131,7 +131,7 @@ impl<'a> Table<'a> {
 
                 // now everything is clear and ready to check if conditions are met
                 let condition = Conditions::new(extracted_conditions);
-                let str_conditions = opt_conditions_as_str.unwrap_or_else(|| "");
+                let str_conditions = opt_conditions_as_str.unwrap_or("");
 
                 if condition.matches_condition(str_conditions) {
                     result.push(line_to_writte);
@@ -165,18 +165,24 @@ impl<'a> Table<'a> {
                     let a_value = a[index].as_str();
                     let b_value = b[index].as_str();
 
-                    let result = if a_value < b_value {
-                        Ordering::Less
-                    } else if a_value > b_value {
-                        Ordering::Greater
-                    } else {
-                        Ordering::Equal
-                    };
-
-                    if *asc {
-                        return result;
-                    } else {
-                        return result.reverse();
+                    match a_value.cmp(b_value) {
+                        Ordering::Less => {
+                            if *asc {
+                                return Ordering::Less;
+                            } else {
+                                return Ordering::Greater;
+                            }
+                        }
+                        Ordering::Greater => {
+                            if *asc {
+                                return Ordering::Greater;
+                            } else {
+                                return Ordering::Less;
+                            }
+                        }
+                        Ordering::Equal => {
+                            continue;
+                        }
                     }
                 }
                 Ordering::Equal
@@ -187,7 +193,7 @@ impl<'a> Table<'a> {
         Ok(result)
     }
 
-    /// given a columns as Vec<String> and values as Vec<String>
+    /// given a columns and values as Vec of String
     /// It returns the proper line to write in the csv
     /// else returns a Error.
     pub fn resolve_insert(
@@ -213,11 +219,12 @@ impl<'a> Table<'a> {
             .map(|(i, _c)| i)
             .collect::<Vec<usize>>();
 
-        if columns.len() != temp_index.len()
-            || columns
-                .iter()
-                .any(|c| !splitted_columns.contains(&c.as_str()))
-        {
+        let bool_missing_table = columns
+            .iter()
+            .any(|c| !splitted_columns.contains(&c.as_str()));
+
+        // columns != temp_index OR the table doesn't exist in the csv file.
+        if columns.len() != temp_index.len() || bool_missing_table {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 "Invalid columns",
@@ -303,7 +310,11 @@ impl<'a> Table<'a> {
 
         self.file.seek(SeekFrom::Start(0))?;
 
-        let mut temporal_file = BufWriter::new(File::create("./temp_file.csv")?);
+        // get current path where the file is located
+        let formal_path = format!("{}/temporal_file.csv", self.get_directory_where_file_is());
+
+        let mut temporal_file = BufWriter::new(File::create(formal_path)?);
+
         temporal_file.write_all(
             columns_from_csv
                 .split(",")
@@ -313,9 +324,9 @@ impl<'a> Table<'a> {
         )?;
         temporal_file.write_all("\n".as_bytes())?;
 
-        for line in BufReader::new(&self.file).lines().into_iter().skip(1) {
+        for line in BufReader::new(&self.file).lines().skip(1) {
             let line = line?;
-            let splitted_line = line.split(",").map(|s| s).collect::<Vec<&str>>();
+            let splitted_line = line.split(",").collect::<Vec<&str>>();
 
             match opt_conditions {
                 Some(str_conditions) => {
@@ -328,8 +339,6 @@ impl<'a> Table<'a> {
                         &splitted_line,
                         &splitted_columns_as_string,
                     );
-
-                    // lets print the conditions
 
                     // lets see all keys and values
                     let condition = Conditions::new(hashed_conditions);
@@ -369,9 +378,9 @@ impl<'a> Table<'a> {
     /// we return a hash of conditions AND the line itself.
     fn extract_conditions(
         &self,
-        index_columns: &Vec<usize>,
-        splitted_line: &Vec<&str>,
-        columns_from_query: &Vec<String>,
+        index_columns: &[usize],
+        splitted_line: &[&str],
+        columns_from_query: &[String],
     ) -> (Vec<(String, Value)>, Vec<String>) {
         let selected_columns = index_columns
             .iter()
@@ -388,12 +397,10 @@ impl<'a> Table<'a> {
             // with this we get the value of the column
             let trimmed_value = selected_columns[j].trim().to_string();
 
-            if let Some(v) = trimmed_value.parse::<i64>().ok() {
+            if let Ok(v) = trimmed_value.parse::<i64>() {
                 vec_conditions.push((column_condition.to_string(), Value::Integer(v)));
-                //hash_conditions.insert(column_condition.to_string(), Value::Integer(v));
             } else {
                 vec_conditions.push((column_condition.to_string(), Value::String(trimmed_value)));
-                //hash_conditions.insert(column_condition.to_string(), Value::String(trimmed_value));
             }
         }
         (vec_conditions, selected_columns)
@@ -426,12 +433,15 @@ impl<'a> Table<'a> {
 
         self.file.seek(SeekFrom::Start(0))?;
 
-        let mut temporal_file = BufWriter::new(File::create("./temp_file.csv")?);
+        let formal_path = format!("{}/temporal_file.csv", self.get_directory_where_file_is());
+
+        let mut temporal_file = BufWriter::new(File::create(formal_path)?);
+        
         temporal_file.write_all(columns_from_csv.as_bytes())?;
 
-        for line in BufReader::new(&self.file).lines().into_iter() {
+        for line in BufReader::new(&self.file).lines() {
             let line = line?;
-            let splitted_line = line.split(",").map(|s| s).collect::<Vec<&str>>();
+            let splitted_line = line.split(",").collect::<Vec<&str>>();
 
             match conditions {
                 Some(str_conditions) => {
@@ -445,9 +455,6 @@ impl<'a> Table<'a> {
                         &splitted_line,
                         &splitted_columns_as_string,
                     );
-
-                    // lets print the conditions
-
                     // lets see all keys and values
                     let condition = Conditions::new(hashed_conditions);
 
@@ -467,6 +474,15 @@ impl<'a> Table<'a> {
 
         Ok(())
     }
+
+    pub fn get_directory_where_file_is(&self) -> String {
+        let file_path_pos = self.get_file_directory().rfind('/').unwrap_or(0);
+
+        match file_path_pos {
+            0 => "./".to_string(),
+            _ => self.get_file_directory()[..file_path_pos].to_string(),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -475,9 +491,9 @@ mod tests {
 
     #[test]
     fn new() {
-        let table = Table::new("./test.csv").unwrap();
+        let table = Table::new("./tests/database.csv").unwrap();
         let filename = table.get_file_name().unwrap();
-        assert_eq!(filename, "test");
+        assert_eq!(filename, "database");
     }
 
     #[test]
@@ -492,7 +508,7 @@ mod tests {
 
     #[test]
     fn invalid_column() {
-        let mut table = Table::new("./test.csv").unwrap();
+        let mut table = Table::new("./tests/database.csv").unwrap();
 
         // tesis is the invalid columns
         let columns = vec!["Edad".to_string(), "Tesis".to_string()];
@@ -503,7 +519,7 @@ mod tests {
 
     #[test]
     fn invalid_column_when_sorting() {
-        let mut table = Table::new("./test.csv").unwrap();
+        let mut table = Table::new("./tests/database.csv").unwrap();
 
         // tesis is the invalid columns
         let columns = vec!["Nombre".to_string(), "Edad".to_string()];
@@ -517,5 +533,30 @@ mod tests {
         // so we are trying to sort by a column that does not exist
         let result = table.resolve_select(columns, conditions, sorting);
         assert_eq!(result.is_err(), true);
+    }
+
+    #[test]
+    fn return_select_returns_ok() {
+        let mut table = Table::new("./tests/database.csv").unwrap();
+
+        let columns = vec!["Nombre".to_string(), "Edad".to_string()];
+        let result = table.resolve_select(columns, None, None);
+        assert_eq!(result.is_ok(), true);
+    }
+
+    #[test]
+    fn return_select_returns_ok_with_conditions() {
+        let mut table = Table::new("./tests/database.csv").unwrap();
+
+        let columns = vec!["Nombre".to_string(), "Edad".to_string()];
+        let conditions = Some("Nombre = 'Luis' AND Edad = 29");
+        let result = table.resolve_select(columns, conditions, None).unwrap();
+
+        let expected_result = vec![
+            vec!["Nombre".to_string(), "Edad".to_string()],
+            vec!["Luis".to_string(), "29".to_string()],
+        ];
+
+        assert_eq!(result, expected_result);
     }
 }

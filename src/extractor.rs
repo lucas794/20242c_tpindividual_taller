@@ -3,12 +3,17 @@ use crate::errors::TPErrors;
 pub struct Extractor;
 
 pub enum SQLCommand {
-    SELECT,
-    INSERT,
-    UPDATE,
-    DELETE,
+    Select,
+    Insert,
+    Update,
+    Delete,
 }
 
+impl Default for Extractor {
+    fn default() -> Self {
+        Extractor::new()
+    }
+}
 impl Extractor {
     pub fn new() -> Extractor {
         Extractor
@@ -18,9 +23,9 @@ impl Extractor {
     /// Example
     /// SELECT name, age FROM table;
     /// Returns ["name", "age"]
-    pub fn extract_columns_for_select<'a>(
+    pub fn extract_columns_for_select(
         &self,
-        query: &'a str,
+        query: &str,
     ) -> Result<Vec<String>, TPErrors<'static>> {
         let query = query.trim();
 
@@ -43,32 +48,26 @@ impl Extractor {
                 Ok(columns)
             }
             None => {
-                return Err(TPErrors::InvalidSyntax(
-                    "Invalid select query (Missing FROM)",
-                ));
+                return Err(TPErrors::Syntax("Invalid select query (Missing FROM)"));
             }
         }
     }
 
-    pub fn extract_columns_and_values_for_insert<'a>(
+    pub fn extract_columns_and_values_for_insert(
         &self,
-        query: &'a str,
+        query: &str,
     ) -> Result<(Vec<String>, Vec<String>), TPErrors<'static>> {
         let (start_columns, end_columns) = match (query.find("("), query.find(")")) {
             (Some(start), Some(end)) => (start, end),
             _ => {
-                return Err(TPErrors::InvalidSyntax(
-                    "Invalid INSERT query (Missing columns)",
-                ));
+                return Err(TPErrors::Syntax("Invalid INSERT query (Missing columns)"));
             }
         };
 
         let (start_values, end_values) = match (query.rfind("("), query.rfind(")")) {
             (Some(start), Some(end)) => (start, end),
             _ => {
-                return Err(TPErrors::InvalidSyntax(
-                    "Invalid INSERT query (Missing values)",
-                ));
+                return Err(TPErrors::Syntax("Invalid INSERT query (Missing values)"));
             }
         };
 
@@ -95,7 +94,7 @@ impl Extractor {
 
         // if len doesnt match we return an error
         if columns.len() != values.len() {
-            return Err(TPErrors::InvalidSyntax(
+            return Err(TPErrors::Syntax(
                 "Invalid INSERT query (Columns and values do not match)",
             ));
         }
@@ -103,14 +102,15 @@ impl Extractor {
         Ok((columns, values))
     }
 
-    pub fn extract_columns_and_values_for_update<'a>(
+    pub fn extract_columns_and_values_for_update(
         &self,
-        query: &'a str,
+        query: &str,
     ) -> Result<(Vec<String>, Vec<String>), TPErrors<'static>> {
         let (start_columns, end_columns) = match (query.find("SET"), query.find("WHERE")) {
             (Some(start), Some(end)) => (start, end),
+            (Some(start), None) => (start, query.len() - 1), // no WHERE, it means ALL tables.., risky..
             _ => {
-                return Err(TPErrors::InvalidSyntax(
+                return Err(TPErrors::Syntax(
                     "Invalid UPDATE query (Missing SET or WHERE)",
                 ));
             }
@@ -133,7 +133,7 @@ impl Extractor {
             let what_to_update = what_to_update.split('=').collect::<Vec<&str>>();
 
             if what_to_update.len() != 2 {
-                return Err(TPErrors::InvalidSyntax("Invalid UPDATE query (Missing =)"));
+                return Err(TPErrors::Syntax("Invalid UPDATE query (Missing =)"));
             }
 
             let column = what_to_update[0].trim().to_string();
@@ -160,7 +160,7 @@ impl Extractor {
 
         match (start, end) {
             (0, 0) => {
-                return Err(TPErrors::InvalidSyntax(
+                return Err(TPErrors::Syntax(
                     "Invalid query (Missing any KEY words on your consult)",
                 ));
             }
@@ -170,31 +170,6 @@ impl Extractor {
                 Ok(table_data)
             }
         }
-
-        /*let from_pos = query.find("FROM");
-        let where_or_end_consult_pos = query
-            .find("WHERE")
-            .or(query.find("ORDER"))
-            .or(query.find(";"));
-        // we either find WHERE, ORDER and lastly, ;, if not present, query is invalid.
-
-        match (from_pos, where_or_end_consult_pos) {
-            (Some(position_from), Some(position_where)) => {
-                let table_data = &query[position_from + "FROM".len()..position_where];
-                let table_data = table_data.trim();
-                Ok(table_data)
-            }
-            _ => {
-                if where_or_end_consult_pos.is_none() {
-                    return Err(TPErrors::InvalidSyntax(
-                        "Invalid select query (Missing WHERE or ;)",
-                    ));
-                }
-                return Err(TPErrors::InvalidSyntax(
-                    "Invalid select query (Missing FROM)",
-                ));
-            }
-        }*/
     }
 
     /// Extracts the position from a QUERY to get the table name
@@ -202,33 +177,24 @@ impl Extractor {
     /// INSERT INTO users (name, age) VALUES ('John', 20); -> gets INTO as start and ( as end, offset will be the length of INTO
     /// UPDATE users SET name = 'John' WHERE id = 3; -> gets UPDATE as start and SET as end, offset will be the length of UPDATE
     /// DELETE FROM users WHERE id = 3; -> gets DELETE as start and FROM as end, offset will be the length of DELETE
-    fn extract_positions<'a>(&self, query: &'a str, consult: SQLCommand) -> (usize, usize, usize) {
+    fn extract_positions(&self, query: &str, consult: SQLCommand) -> (usize, usize, usize) {
         let query = query.trim();
 
         let start = match consult {
-            SQLCommand::SELECT | SQLCommand::DELETE => match query.find("FROM") {
-                Some(pos) => pos,
-                None => 0,
-            },
-            SQLCommand::INSERT => match query.find("INTO") {
-                Some(pos) => pos,
-                None => 0,
-            },
-            SQLCommand::UPDATE => match query.find("UPDATE") {
-                Some(pos) => pos,
-                None => 0,
-            },
+            SQLCommand::Select | SQLCommand::Delete => query.find("FROM").unwrap_or(0),
+            SQLCommand::Insert => query.find("INTO").unwrap_or(0),
+            SQLCommand::Update => query.find("UPDATE").unwrap_or(0),
         };
 
         let offset = match consult {
-            SQLCommand::SELECT => "FROM".len(),
-            SQLCommand::INSERT => "INTO".len(),
-            SQLCommand::UPDATE => "UPDATE".len(),
-            SQLCommand::DELETE => "FROM".len(),
+            SQLCommand::Select => "FROM".len(),
+            SQLCommand::Insert => "INTO".len(),
+            SQLCommand::Update => "UPDATE".len(),
+            SQLCommand::Delete => "FROM".len(),
         };
 
         let end = match consult {
-            SQLCommand::SELECT => {
+            SQLCommand::Select => {
                 match query.find("WHERE") {
                     // we need to find WHERE, ORDER or ;
                     Some(pos) => pos,
@@ -238,26 +204,27 @@ impl Extractor {
                             Some(pos) => pos,
                             None => {
                                 // NO ORDER, so we need to find ;
-                                match query.find(";") {
-                                    Some(pos) => pos,
-                                    None => 0, // At this point, this should never happen since we checked before.
-                                }
+                                query.find(";").unwrap_or(0)
                             }
                         }
                     }
                 }
             }
-            SQLCommand::INSERT => match query.find("(") {
+            SQLCommand::Insert => {
+                query.find("(").unwrap_or(0)
+                /*let possible_end = query.find("(").unwrap_or(0);
+                let values_start = query.find("VALUES").unwrap_or(0);
+
+                if possible_end < values_start {
+                    possible_end
+                } else {
+                    values_start
+                }*/
+            }
+            SQLCommand::Update => query.find("SET").unwrap_or(0),
+            SQLCommand::Delete => match query.find("WHERE") {
                 Some(pos) => pos,
-                None => 0,
-            },
-            SQLCommand::UPDATE => match query.find("SET") {
-                Some(pos) => pos,
-                None => 0,
-            },
-            SQLCommand::DELETE => match query.find("WHERE") {
-                Some(pos) => pos,
-                None => query.find(";").unwrap(),
+                None => query.find(";").unwrap_or(0),
             },
         };
         (start, offset, end)
@@ -315,14 +282,11 @@ impl Extractor {
         str_orderby
             .split(',')
             .map(|part| {
-                let parts: Vec<&str> = part.trim().split_whitespace().collect();
+                let parts: Vec<&str> = part.split_whitespace().collect();
                 let column = parts[0].to_string();
                 // Default to ascending order if no direction is specified
-                let asc = if parts.len() == 2 && parts[1].eq("DESC") {
-                    false
-                } else {
-                    true
-                };
+                // clippy witch.
+                let asc = !(parts.len() == 2 && parts[1].eq("DESC"));
                 (column, asc)
             })
             .collect()
@@ -356,7 +320,7 @@ mod tests {
 
         for consult in consults {
             let table = extractor
-                .extract_table(consult, SQLCommand::SELECT)
+                .extract_table(consult, SQLCommand::Select)
                 .unwrap();
             assert_eq!(table, "table");
         }
@@ -460,16 +424,16 @@ mod tests {
         let mut end;
         let i = 0;
 
-        (start, offset, end) = extractor.extract_positions(consults[i], SQLCommand::SELECT);
+        (start, offset, end) = extractor.extract_positions(consults[i], SQLCommand::Select);
         assert_eq!((start, offset, end), expected[i]);
 
-        (start, offset, end) = extractor.extract_positions(consults[i + 1], SQLCommand::INSERT);
+        (start, offset, end) = extractor.extract_positions(consults[i + 1], SQLCommand::Insert);
         assert_eq!((start, offset, end), expected[i + 1]);
 
-        (start, offset, end) = extractor.extract_positions(consults[i + 2], SQLCommand::UPDATE);
+        (start, offset, end) = extractor.extract_positions(consults[i + 2], SQLCommand::Update);
         assert_eq!((start, offset, end), expected[i + 2]);
 
-        (start, offset, end) = extractor.extract_positions(consults[i + 3], SQLCommand::DELETE);
+        (start, offset, end) = extractor.extract_positions(consults[i + 3], SQLCommand::Delete);
         assert_eq!((start, offset, end), expected[i + 3]);
     }
 
@@ -483,23 +447,23 @@ mod tests {
         let consult_delete = "DELETE FROM users WHERE id = 3;";
 
         let table_select = extractor
-            .extract_table(consult_select, SQLCommand::INSERT)
+            .extract_table(consult_select, SQLCommand::Insert)
             .unwrap();
         assert_eq!(table_select, "users");
 
         let table_insert = extractor
-            .extract_table(consult_insert, SQLCommand::SELECT)
+            .extract_table(consult_insert, SQLCommand::Select)
             .unwrap();
 
         assert_eq!(table_insert, "users");
 
         let table_update = extractor
-            .extract_table(consult_update, SQLCommand::UPDATE)
+            .extract_table(consult_update, SQLCommand::Update)
             .unwrap();
         assert_eq!(table_update, "users");
 
         let table_delete = extractor
-            .extract_table(consult_delete, SQLCommand::DELETE)
+            .extract_table(consult_delete, SQLCommand::Delete)
             .unwrap();
 
         assert_eq!(table_delete, "users");

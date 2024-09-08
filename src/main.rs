@@ -31,7 +31,7 @@ fn valid_number_of_args(args: &usize) -> bool {
 fn run(args: Vec<String>) -> Result<(), errors::TPErrors<'static>> {
     if !valid_number_of_args(&args.len()) {
         // we stop the program, invalid number of arguments
-        return Err(TPErrors::InvalidGeneric("Invalid number of arguments"));
+        return Err(TPErrors::Generic("Invalid number of arguments"));
     }
 
     // Now, we have the arguments...
@@ -43,7 +43,7 @@ fn run(args: Vec<String>) -> Result<(), errors::TPErrors<'static>> {
     let mut table = match opening_table {
         Ok(table) => table,
         Err(_) => {
-            return Err(TPErrors::InvalidTable(
+            return Err(TPErrors::Table(
                 "Error opening the table - The selected table is invalid",
             ));
         }
@@ -59,13 +59,13 @@ fn run(args: Vec<String>) -> Result<(), errors::TPErrors<'static>> {
             let select = Select::new();
 
             if !select.is_valid_query(consult) {
-                return Err(TPErrors::InvalidSyntax(
+                return Err(TPErrors::Syntax(
                     "Invalid select query (Missing either SELECT , FROM or ;)",
                 ));
             }
 
             // checking if its a valid table
-            match extractor.extract_table(&consult, SQLCommand::SELECT) {
+            match extractor.extract_table(consult, SQLCommand::Select) {
                 Ok(table_name_from_query) => {
                     let table_name = match table.get_file_name() {
                         Ok(table_name) => table_name,
@@ -75,7 +75,7 @@ fn run(args: Vec<String>) -> Result<(), errors::TPErrors<'static>> {
                     };
 
                     if table_name_from_query != table_name {
-                        return Err(TPErrors::InvalidTable("Invalid table selected"));
+                        return Err(TPErrors::Table("Invalid table selected"));
                     }
                 }
                 Err(e) => {
@@ -92,10 +92,10 @@ fn run(args: Vec<String>) -> Result<(), errors::TPErrors<'static>> {
             };
 
             // Conditions of the query (if they exists)
-            let conditions = extractor.extract_as_str_conditions(&consult);
+            let conditions = extractor.extract_as_str_conditions(consult);
 
             // Sorting method (if existst)
-            let sorting_vector = match extractor.extract_orderby_as_str(&consult) {
+            let sorting_vector = match extractor.extract_orderby_as_str(consult) {
                 Some(sorting) => {
                     let vec_sort = extractor.parser_orderby_from_str_to_vec(sorting);
                     Some(vec_sort)
@@ -107,7 +107,7 @@ fn run(args: Vec<String>) -> Result<(), errors::TPErrors<'static>> {
             let result = select.execute_select(&mut table, columns, conditions, sorting_vector);
 
             if result.is_err() {
-                return Err(TPErrors::InvalidSyntax("Invalid columns inside the query"));
+                return Err(TPErrors::Syntax("Invalid columns inside the query"));
             }
 
             return Ok(());
@@ -116,12 +116,12 @@ fn run(args: Vec<String>) -> Result<(), errors::TPErrors<'static>> {
             let insert = Insert::new();
 
             if !insert.is_valid_query(consult) {
-                return Err(TPErrors::InvalidSyntax(
+                return Err(TPErrors::Syntax(
                     "Invalid insert query (Missing either INSERT INTO, VALUES or ;)",
                 ));
             }
 
-            let table_from_query = match extractor.extract_table(&consult, SQLCommand::INSERT) {
+            let table_from_query = match extractor.extract_table(consult, SQLCommand::Insert) {
                 Ok(table_as_string) => table_as_string,
                 Err(e) => {
                     return Err(e);
@@ -131,7 +131,7 @@ fn run(args: Vec<String>) -> Result<(), errors::TPErrors<'static>> {
             match table.get_file_name() {
                 Ok(table_name) => {
                     if table_from_query != table_name {
-                        return Err(TPErrors::InvalidTable("Invalid table selected"));
+                        return Err(TPErrors::Syntax("Invalid table selected"));
                     }
                 }
                 Err(e) => {
@@ -149,7 +149,7 @@ fn run(args: Vec<String>) -> Result<(), errors::TPErrors<'static>> {
             let result = insert.execute_insert(&mut table, columns, values);
 
             if result.is_err() {
-                return Err(TPErrors::InvalidSyntax("Invalid columns inside the query"));
+                return Err(TPErrors::Syntax("Invalid columns inside the query"));
             }
 
             return Ok(());
@@ -158,13 +158,13 @@ fn run(args: Vec<String>) -> Result<(), errors::TPErrors<'static>> {
             let update = Update::new();
 
             if !update.is_valid_query(consult) {
-                return Err(TPErrors::InvalidSyntax(
+                return Err(TPErrors::Syntax(
                     "Invalid update query (Missing either UPDATE, SET, WHERE or ;)",
                 ));
             }
 
             // checking if its a valid table
-            match extractor.extract_table(&consult, SQLCommand::UPDATE) {
+            match extractor.extract_table(consult, SQLCommand::Update) {
                 Ok(table_name_from_query) => {
                     let table_name = match table.get_file_name() {
                         Ok(table_name) => table_name,
@@ -174,7 +174,7 @@ fn run(args: Vec<String>) -> Result<(), errors::TPErrors<'static>> {
                     };
 
                     if table_name_from_query != table_name {
-                        return Err(TPErrors::InvalidTable("Invalid table selected"));
+                        return Err(TPErrors::Table("Invalid table selected"));
                     }
                 }
                 Err(e) => {
@@ -188,25 +188,25 @@ fn run(args: Vec<String>) -> Result<(), errors::TPErrors<'static>> {
                 }
             };
 
-            let conditions = extractor.extract_as_str_conditions(&consult);
+            let conditions = extractor.extract_as_str_conditions(consult);
 
             let result = update.execute_update(&mut table, columns, values, conditions);
 
             if result.is_err() {
-                return Err(TPErrors::InvalidSyntax("Invalid columns inside the query"));
+                return Err(TPErrors::Syntax("Invalid columns inside the query"));
             }
         }
         "DELETE" => {
             let delete = Delete::new();
 
             if !delete.is_valid_query(consult) {
-                return Err(TPErrors::InvalidSyntax(
+                return Err(TPErrors::Syntax(
                     "Invalid delete query (Missing either DELETE, FROM or ;)",
                 ));
             }
 
             // checking if its a valid table
-            match extractor.extract_table(&consult, SQLCommand::DELETE) {
+            match extractor.extract_table(consult, SQLCommand::Delete) {
                 Ok(table_name_from_query) => {
                     let table_name = match table.get_file_name() {
                         Ok(table_name) => table_name,
@@ -216,7 +216,7 @@ fn run(args: Vec<String>) -> Result<(), errors::TPErrors<'static>> {
                     };
 
                     if table_name_from_query != table_name {
-                        return Err(TPErrors::InvalidTable("Invalid table selected"));
+                        return Err(TPErrors::Table("Invalid table selected"));
                     }
                 }
                 Err(e) => {
@@ -224,16 +224,16 @@ fn run(args: Vec<String>) -> Result<(), errors::TPErrors<'static>> {
                 }
             };
 
-            let conditions = extractor.extract_as_str_conditions(&consult);
+            let conditions = extractor.extract_as_str_conditions(consult);
 
             let result = delete.execute_delete(&mut table, conditions);
 
             if result.is_err() {
-                //return Err(TPErrors::InvalidSyntax("Invalid columns inside the query"));
+                return Err(TPErrors::Generic("Something happened with the deletion"));
             }
         }
         _ => {
-            return Err(TPErrors::InvalidSyntax("Invalid command"));
+            return Err(TPErrors::Syntax("Invalid command"));
         }
     }
     Ok(())

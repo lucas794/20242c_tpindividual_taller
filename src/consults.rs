@@ -13,6 +13,28 @@ pub struct Delete;
 
 /// implementation of the select query
 /// select uses query general validator
+///
+impl Default for Select {
+    fn default() -> Self {
+        Select::new()
+    }
+}
+impl Default for Insert {
+    fn default() -> Self {
+        Insert::new()
+    }
+}
+impl Default for Update {
+    fn default() -> Self {
+        Update::new()
+    }
+}
+impl Default for Delete {
+    fn default() -> Self {
+        Delete::new()
+    }
+}
+
 impl Select {
     pub fn new() -> Select {
         Select
@@ -20,7 +42,7 @@ impl Select {
 
     /// A valid select query contains SELECT and FROM AND ends with ;
     /// if the query is valid, it will return true
-    pub fn is_valid_query<'a>(&self, query: &'a str) -> bool {
+    pub fn is_valid_query(&self, query: &str) -> bool {
         let query = query.trim();
 
         if query.starts_with("SELECT") && query.contains("FROM") {
@@ -53,13 +75,13 @@ impl Select {
 
                 for line in data {
                     let mut temp_line = line.join(",");
-                    temp_line.push_str("\n");
+                    temp_line.push('\n');
                     let _ = handle.write(temp_line.as_bytes());
                 }
                 Ok(())
             }
             Err(_) => {
-                return Err(TPErrors::InvalidSyntax("Invalid columns inside the query"));
+                return Err(TPErrors::Syntax("Invalid columns inside the query"));
             }
         }
     }
@@ -72,7 +94,7 @@ impl Insert {
 
     /// A valid INSERT query contains INSERT INTO and VALUES AND ends with ;
     /// if the query is valid, it will return true
-    pub fn is_valid_query<'a>(&self, query: &'a str) -> bool {
+    pub fn is_valid_query(&self, query: &str) -> bool {
         let query = query.trim();
 
         if query.starts_with("INSERT INTO") && query.contains("VALUES") {
@@ -96,18 +118,16 @@ impl Insert {
         match resolve {
             Ok(line) => {
                 let mut line = line.join(",");
-                line.push_str("\n");
+                line.push('\n');
                 match table.insert_line_to_csv(line) {
-                    Ok(_) => {
-                        return Ok(());
-                    }
+                    Ok(_) => Ok(()),
                     Err(_) => {
-                        return Err(TPErrors::InvalidGeneric("Error while inserting line"));
+                        return Err(TPErrors::Generic("Error while inserting line"));
                     }
                 }
             }
             Err(_) => {
-                return Err(TPErrors::InvalidGeneric(
+                return Err(TPErrors::Generic(
                     "Invalid columns inside the query / mismatch with the table",
                 ));
             }
@@ -124,7 +144,7 @@ impl Update {
     /// if the query is valid, it will return true
     /// UPDATE table_name SET column1 = value1, column2 = value2 WHERE condition;
     /// UPDATE table_name SET column1 = value1, column2 = value2;
-    pub fn is_valid_query<'a>(&self, query: &'a str) -> bool {
+    pub fn is_valid_query(&self, query: &str) -> bool {
         let query = query.trim();
 
         if query.starts_with("UPDATE") && query.contains("SET") {
@@ -150,53 +170,28 @@ impl Update {
                 // we need to make a shift of files
                 // temporal file should be renamed to the original file name
                 // and the original file should be deleted
-                let file_directory = table.get_file_directory();
 
-                let file_name = match table.get_file_name() {
-                    Ok(file_name) => file_name,
-                    Err(_) => {
-                        return Err(TPErrors::InvalidGeneric(
-                            "Error getting the name of the file to update",
-                        ));
-                    }
-                };
-                // lets close the file
+                let original_file = table.get_file_directory();
+                let replacement =
+                    format!("{}/temporal_file.csv", table.get_directory_where_file_is());
 
-                // we need to delete the original file
-                match fs::remove_file(file_directory) {
+                match fs::remove_file(original_file) {
                     Ok(_) => {}
                     Err(_) => {
-                        return Err(TPErrors::InvalidGeneric(
-                            "Error while deleting the original file",
-                        ));
-                    }
-                }
-                // the directory is until the last / is found
-                let pos_last_backlash = match file_directory.rfind('/') {
-                    Some(pos) => pos,
-                    None => 0,
-                };
-
-                let temp_file_name =
-                    format!("{}/temp_file.csv", &file_directory[0..pos_last_backlash]);
-                let oficial_file_name = format!(
-                    "{}/{}.csv",
-                    &file_directory[0..pos_last_backlash],
-                    file_name
-                );
-                match fs::rename(&temp_file_name, &oficial_file_name) {
-                    Ok(_) => {}
-                    Err(_) => {
-                        return Err(TPErrors::InvalidGeneric(
-                            "Error while renaming the temporal file",
-                        ));
+                        return Err(TPErrors::Generic("Error while deleting the original file"));
                     }
                 }
 
-                return Ok(());
+                match fs::rename(replacement, original_file) {
+                    Ok(_) => {}
+                    Err(_) => {
+                        return Err(TPErrors::Generic("Error while renaming the temporal file"));
+                    }
+                }
+                Ok(())
             }
             Err(_) => {
-                return Err(TPErrors::InvalidSyntax("Invalid columns inside the query"));
+                return Err(TPErrors::Syntax("Invalid columns inside the query"));
             }
         }
     }
@@ -207,7 +202,7 @@ impl Delete {
         Delete
     }
 
-    pub fn is_valid_query<'a>(&self, query: &'a str) -> bool {
+    pub fn is_valid_query(&self, query: &str) -> bool {
         let query = query.trim();
 
         if query.starts_with("DELETE") && query.contains("FROM") {
@@ -231,12 +226,29 @@ impl Delete {
                 // we need to make a shift of files
                 // temporal file should be renamed to the original file name
                 // and the original file should be deleted
-                let file_directory = table.get_file_directory();
+                let original_file = table.get_file_directory();
+                let replacement =
+                    format!("{}/temporal_file.csv", table.get_directory_where_file_is());
+
+                match fs::remove_file(original_file) {
+                    Ok(_) => {}
+                    Err(_) => {
+                        return Err(TPErrors::Generic("Error while deleting the original file"));
+                    }
+                }
+
+                match fs::rename(replacement, original_file) {
+                    Ok(_) => {}
+                    Err(_) => {
+                        return Err(TPErrors::Generic("Error while renaming the temporal file"));
+                    }
+                }
+                /*let file_directory = table.get_file_directory();
 
                 let file_name = match table.get_file_name() {
                     Ok(file_name) => file_name,
                     Err(_) => {
-                        return Err(TPErrors::InvalidGeneric(
+                        return Err(TPErrors::Generic(
                             "Error getting the name of the file to update",
                         ));
                     }
@@ -247,17 +259,12 @@ impl Delete {
                 match fs::remove_file(file_directory) {
                     Ok(_) => {}
                     Err(_) => {
-                        return Err(TPErrors::InvalidGeneric(
-                            "Error while deleting the original file",
-                        ));
+                        return Err(TPErrors::Generic("Error while deleting the original file"));
                     }
                 }
 
                 // the directory is until the last / is found
-                let pos_last_backlash = match file_directory.rfind('/') {
-                    Some(pos) => pos,
-                    None => 0,
-                };
+                let pos_last_backlash = file_directory.rfind('/').unwrap_or(0);
 
                 let temp_file_name =
                     format!("{}/temp_file.csv", &file_directory[0..pos_last_backlash]);
@@ -269,16 +276,14 @@ impl Delete {
                 match fs::rename(&temp_file_name, &oficial_file_name) {
                     Ok(_) => {}
                     Err(_) => {
-                        return Err(TPErrors::InvalidGeneric(
-                            "Error while renaming the temporal file",
-                        ));
+                        return Err(TPErrors::Generic("Error while renaming the temporal file"));
                     }
-                }
+                }*/
 
-                return Ok(());
+                Ok(())
             }
             Err(_) => {
-                return Err(TPErrors::InvalidSyntax("Invalid columns inside the query"));
+                return Err(TPErrors::Syntax("Invalid columns inside the query"));
             }
         }
     }
@@ -289,7 +294,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn select_invalid_query() {
+    fn select_invalid_query_throws_error() {
         let select = Select::new();
         let invalid_consults: Vec<&str> = Vec::from([
             "name, age FROM table",    // missing select
@@ -303,7 +308,7 @@ mod tests {
 
     #[test]
     fn execute_select_fails_with_invalid_columns() {
-        let mut table = Table::new("./test.csv").unwrap();
+        let mut table = Table::new("./tests/database.csv").unwrap();
         let select = Select::new();
         // i'm trying to select a column that does not exist
         let columns = vec!["Trabajo Profesional".to_string()];
