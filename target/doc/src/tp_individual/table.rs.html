@@ -519,6 +519,44 @@
 <a href="#519" id="519">519</a>
 <a href="#520" id="520">520</a>
 <a href="#521" id="521">521</a>
+<a href="#522" id="522">522</a>
+<a href="#523" id="523">523</a>
+<a href="#524" id="524">524</a>
+<a href="#525" id="525">525</a>
+<a href="#526" id="526">526</a>
+<a href="#527" id="527">527</a>
+<a href="#528" id="528">528</a>
+<a href="#529" id="529">529</a>
+<a href="#530" id="530">530</a>
+<a href="#531" id="531">531</a>
+<a href="#532" id="532">532</a>
+<a href="#533" id="533">533</a>
+<a href="#534" id="534">534</a>
+<a href="#535" id="535">535</a>
+<a href="#536" id="536">536</a>
+<a href="#537" id="537">537</a>
+<a href="#538" id="538">538</a>
+<a href="#539" id="539">539</a>
+<a href="#540" id="540">540</a>
+<a href="#541" id="541">541</a>
+<a href="#542" id="542">542</a>
+<a href="#543" id="543">543</a>
+<a href="#544" id="544">544</a>
+<a href="#545" id="545">545</a>
+<a href="#546" id="546">546</a>
+<a href="#547" id="547">547</a>
+<a href="#548" id="548">548</a>
+<a href="#549" id="549">549</a>
+<a href="#550" id="550">550</a>
+<a href="#551" id="551">551</a>
+<a href="#552" id="552">552</a>
+<a href="#553" id="553">553</a>
+<a href="#554" id="554">554</a>
+<a href="#555" id="555">555</a>
+<a href="#556" id="556">556</a>
+<a href="#557" id="557">557</a>
+<a href="#558" id="558">558</a>
+<a href="#559" id="559">559</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{
     cmp::Ordering,
     collections::HashMap,
@@ -566,7 +604,7 @@
         <span class="kw">let </span>table_file = <span class="kw">match </span><span class="self">self</span>.file_name.split(<span class="string">"/"</span>).last() {
             <span class="prelude-val">Some</span>(name) =&gt; name,
             <span class="prelude-val">None </span>=&gt; {
-                <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::InvalidGeneric(
+                <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::Generic(
                     <span class="string">"Error getting table file name by unknown reason"</span>,
                 ));
             }
@@ -576,7 +614,7 @@
         </span><span class="kw">let </span>table_name = <span class="kw">match </span>table_file.split(<span class="string">"."</span>).next() {
             <span class="prelude-val">Some</span>(name) =&gt; name,
             <span class="prelude-val">None </span>=&gt; {
-                <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::InvalidGeneric(
+                <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::Generic(
                     <span class="string">"Error getting table name, splitting by '.' failed"</span>,
                 ));
             }
@@ -643,7 +681,7 @@
 
         <span class="kw">for </span>line_read <span class="kw">in </span>std::io::BufReader::new(<span class="kw-2">&amp;</span><span class="self">self</span>.file).lines().skip(<span class="number">1</span>) {
             <span class="kw">let </span>line = line_read<span class="question-mark">?</span>;
-            <span class="kw">let </span>splitted_line = line.split(<span class="string">","</span>).map(|s| s).collect::&lt;Vec&lt;<span class="kw-2">&amp;</span>str&gt;&gt;();
+            <span class="kw">let </span>splitted_line = line.split(<span class="string">","</span>).collect::&lt;Vec&lt;<span class="kw-2">&amp;</span>str&gt;&gt;();
 
             <span class="kw">if </span>opt_conditions_as_str.is_some() {
                 <span class="comment">// we have conditions to check
@@ -652,7 +690,7 @@
 
                 <span class="comment">// now everything is clear and ready to check if conditions are met
                 </span><span class="kw">let </span>condition = Conditions::new(extracted_conditions);
-                <span class="kw">let </span>str_conditions = opt_conditions_as_str.unwrap_or_else(|| <span class="string">""</span>);
+                <span class="kw">let </span>str_conditions = opt_conditions_as_str.unwrap_or(<span class="string">""</span>);
 
                 <span class="kw">if </span>condition.matches_condition(str_conditions) {
                     result.push(line_to_writte);
@@ -686,18 +724,24 @@
                     <span class="kw">let </span>a_value = a[index].as_str();
                     <span class="kw">let </span>b_value = b[index].as_str();
 
-                    <span class="kw">let </span>result = <span class="kw">if </span>a_value &lt; b_value {
-                        Ordering::Less
-                    } <span class="kw">else if </span>a_value &gt; b_value {
-                        Ordering::Greater
-                    } <span class="kw">else </span>{
-                        Ordering::Equal
-                    };
-
-                    <span class="kw">if </span><span class="kw-2">*</span>asc {
-                        <span class="kw">return </span>result;
-                    } <span class="kw">else </span>{
-                        <span class="kw">return </span>result.reverse();
+                    <span class="kw">match </span>a_value.cmp(b_value) {
+                        Ordering::Less =&gt; {
+                            <span class="kw">if </span><span class="kw-2">*</span>asc {
+                                <span class="kw">return </span>Ordering::Less;
+                            } <span class="kw">else </span>{
+                                <span class="kw">return </span>Ordering::Greater;
+                            }
+                        }
+                        Ordering::Greater =&gt; {
+                            <span class="kw">if </span><span class="kw-2">*</span>asc {
+                                <span class="kw">return </span>Ordering::Greater;
+                            } <span class="kw">else </span>{
+                                <span class="kw">return </span>Ordering::Less;
+                            }
+                        }
+                        Ordering::Equal =&gt; {
+                            <span class="kw">continue</span>;
+                        }
                     }
                 }
                 Ordering::Equal
@@ -708,7 +752,7 @@
         </span><span class="prelude-val">Ok</span>(result)
     }
 
-    <span class="doccomment">/// given a columns as Vec&lt;String&gt; and values as Vec&lt;String&gt;
+    <span class="doccomment">/// given a columns and values as Vec of String
     /// It returns the proper line to write in the csv
     /// else returns a Error.
     </span><span class="kw">pub fn </span>resolve_insert(
@@ -734,11 +778,12 @@
             .map(|(i, _c)| i)
             .collect::&lt;Vec&lt;usize&gt;&gt;();
 
-        <span class="kw">if </span>columns.len() != temp_index.len()
-            || columns
-                .iter()
-                .any(|c| !splitted_columns.contains(<span class="kw-2">&amp;</span>c.as_str()))
-        {
+        <span class="kw">let </span>bool_missing_table = columns
+            .iter()
+            .any(|c| !splitted_columns.contains(<span class="kw-2">&amp;</span>c.as_str()));
+
+        <span class="comment">// columns != temp_index OR the table doesn't exist in the csv file.
+        </span><span class="kw">if </span>columns.len() != temp_index.len() || bool_missing_table {
             <span class="kw">return </span><span class="prelude-val">Err</span>(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 <span class="string">"Invalid columns"</span>,
@@ -824,7 +869,11 @@
 
         </span><span class="self">self</span>.file.seek(SeekFrom::Start(<span class="number">0</span>))<span class="question-mark">?</span>;
 
-        <span class="kw">let </span><span class="kw-2">mut </span>temporal_file = BufWriter::new(File::create(<span class="string">"./temp_file.csv"</span>)<span class="question-mark">?</span>);
+        <span class="comment">// get current path where the file is located
+        </span><span class="kw">let </span>formal_path = <span class="macro">format!</span>(<span class="string">"{}/temporal_file.csv"</span>, <span class="self">self</span>.get_directory_where_file_is());
+
+        <span class="kw">let </span><span class="kw-2">mut </span>temporal_file = BufWriter::new(File::create(formal_path)<span class="question-mark">?</span>);
+
         temporal_file.write_all(
             columns_from_csv
                 .split(<span class="string">","</span>)
@@ -834,9 +883,9 @@
         )<span class="question-mark">?</span>;
         temporal_file.write_all(<span class="string">"\n"</span>.as_bytes())<span class="question-mark">?</span>;
 
-        <span class="kw">for </span>line <span class="kw">in </span>BufReader::new(<span class="kw-2">&amp;</span><span class="self">self</span>.file).lines().into_iter().skip(<span class="number">1</span>) {
+        <span class="kw">for </span>line <span class="kw">in </span>BufReader::new(<span class="kw-2">&amp;</span><span class="self">self</span>.file).lines().skip(<span class="number">1</span>) {
             <span class="kw">let </span>line = line<span class="question-mark">?</span>;
-            <span class="kw">let </span>splitted_line = line.split(<span class="string">","</span>).map(|s| s).collect::&lt;Vec&lt;<span class="kw-2">&amp;</span>str&gt;&gt;();
+            <span class="kw">let </span>splitted_line = line.split(<span class="string">","</span>).collect::&lt;Vec&lt;<span class="kw-2">&amp;</span>str&gt;&gt;();
 
             <span class="kw">match </span>opt_conditions {
                 <span class="prelude-val">Some</span>(str_conditions) =&gt; {
@@ -850,9 +899,7 @@
                         <span class="kw-2">&amp;</span>splitted_columns_as_string,
                     );
 
-                    <span class="comment">// lets print the conditions
-
-                    // lets see all keys and values
+                    <span class="comment">// lets see all keys and values
                     </span><span class="kw">let </span>condition = Conditions::new(hashed_conditions);
 
                     <span class="comment">// lets see all keys and values
@@ -890,9 +937,9 @@
     /// we return a hash of conditions AND the line itself.
     </span><span class="kw">fn </span>extract_conditions(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        index_columns: <span class="kw-2">&amp;</span>Vec&lt;usize&gt;,
-        splitted_line: <span class="kw-2">&amp;</span>Vec&lt;<span class="kw-2">&amp;</span>str&gt;,
-        columns_from_query: <span class="kw-2">&amp;</span>Vec&lt;String&gt;,
+        index_columns: <span class="kw-2">&amp;</span>[usize],
+        splitted_line: <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>str],
+        columns_from_query: <span class="kw-2">&amp;</span>[String],
     ) -&gt; (Vec&lt;(String, Value)&gt;, Vec&lt;String&gt;) {
         <span class="kw">let </span>selected_columns = index_columns
             .iter()
@@ -909,13 +956,11 @@
             <span class="comment">// with this we get the value of the column
             </span><span class="kw">let </span>trimmed_value = selected_columns[j].trim().to_string();
 
-            <span class="kw">if let </span><span class="prelude-val">Some</span>(v) = trimmed_value.parse::&lt;i64&gt;().ok() {
+            <span class="kw">if let </span><span class="prelude-val">Ok</span>(v) = trimmed_value.parse::&lt;i64&gt;() {
                 vec_conditions.push((column_condition.to_string(), Value::Integer(v)));
-                <span class="comment">//hash_conditions.insert(column_condition.to_string(), Value::Integer(v));
-            </span>} <span class="kw">else </span>{
+            } <span class="kw">else </span>{
                 vec_conditions.push((column_condition.to_string(), Value::String(trimmed_value)));
-                <span class="comment">//hash_conditions.insert(column_condition.to_string(), Value::String(trimmed_value));
-            </span>}
+            }
         }
         (vec_conditions, selected_columns)
     }
@@ -936,7 +981,7 @@
         // else we need to keep the line
         // we need to write the lines that are not deleted in a temporal file
         // and then rename the temporal file to the original file
-        // lets get the first line of the file to copy on the new file 
+        // lets get the first line of the file to copy on the new file
         </span><span class="kw">let </span>columns_from_csv = std::io::BufReader::new(<span class="kw-2">&amp;</span><span class="self">self</span>.file)
             .lines()
             .next()
@@ -950,9 +995,9 @@
         <span class="kw">let </span><span class="kw-2">mut </span>temporal_file = BufWriter::new(File::create(<span class="string">"./temp_file.csv"</span>)<span class="question-mark">?</span>);
         temporal_file.write_all(columns_from_csv.as_bytes())<span class="question-mark">?</span>;
 
-        <span class="kw">for </span>line <span class="kw">in </span>BufReader::new(<span class="kw-2">&amp;</span><span class="self">self</span>.file).lines().into_iter() {
+        <span class="kw">for </span>line <span class="kw">in </span>BufReader::new(<span class="kw-2">&amp;</span><span class="self">self</span>.file).lines() {
             <span class="kw">let </span>line = line<span class="question-mark">?</span>;
-            <span class="kw">let </span>splitted_line = line.split(<span class="string">","</span>).map(|s| s).collect::&lt;Vec&lt;<span class="kw-2">&amp;</span>str&gt;&gt;();
+            <span class="kw">let </span>splitted_line = line.split(<span class="string">","</span>).collect::&lt;Vec&lt;<span class="kw-2">&amp;</span>str&gt;&gt;();
 
             <span class="kw">match </span>conditions {
                 <span class="prelude-val">Some</span>(str_conditions) =&gt; {
@@ -966,10 +1011,7 @@
                         <span class="kw-2">&amp;</span>splitted_line,
                         <span class="kw-2">&amp;</span>splitted_columns_as_string,
                     );
-
-                    <span class="comment">// lets print the conditions
-
-                    // lets see all keys and values
+                    <span class="comment">// lets see all keys and values
                     </span><span class="kw">let </span>condition = Conditions::new(hashed_conditions);
 
                     <span class="comment">// lets see all keys and values
@@ -988,6 +1030,15 @@
 
         <span class="prelude-val">Ok</span>(())
     }
+
+    <span class="kw">pub fn </span>get_directory_where_file_is(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
+        <span class="kw">let </span>file_path_pos = <span class="self">self</span>.get_file_directory().rfind(<span class="string">'/'</span>).unwrap_or(<span class="number">0</span>);
+
+        <span class="kw">match </span>file_path_pos {
+            <span class="number">0 </span>=&gt; <span class="string">"./"</span>.to_string(),
+            <span class="kw">_ </span>=&gt; <span class="self">self</span>.get_file_directory()[..file_path_pos].to_string(),
+        }
+    }
 }
 
 <span class="attr">#[cfg(test)]
@@ -996,9 +1047,9 @@
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>new() {
-        <span class="kw">let </span>table = Table::new(<span class="string">"./test.csv"</span>).unwrap();
+        <span class="kw">let </span>table = Table::new(<span class="string">"./tests/database.csv"</span>).unwrap();
         <span class="kw">let </span>filename = table.get_file_name().unwrap();
-        <span class="macro">assert_eq!</span>(filename, <span class="string">"test"</span>);
+        <span class="macro">assert_eq!</span>(filename, <span class="string">"database"</span>);
     }
 
     <span class="attr">#[test]
@@ -1013,7 +1064,7 @@
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>invalid_column() {
-        <span class="kw">let </span><span class="kw-2">mut </span>table = Table::new(<span class="string">"./test.csv"</span>).unwrap();
+        <span class="kw">let </span><span class="kw-2">mut </span>table = Table::new(<span class="string">"./tests/database.csv"</span>).unwrap();
 
         <span class="comment">// tesis is the invalid columns
         </span><span class="kw">let </span>columns = <span class="macro">vec!</span>[<span class="string">"Edad"</span>.to_string(), <span class="string">"Tesis"</span>.to_string()];
@@ -1024,7 +1075,7 @@
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>invalid_column_when_sorting() {
-        <span class="kw">let </span><span class="kw-2">mut </span>table = Table::new(<span class="string">"./test.csv"</span>).unwrap();
+        <span class="kw">let </span><span class="kw-2">mut </span>table = Table::new(<span class="string">"./tests/database.csv"</span>).unwrap();
 
         <span class="comment">// tesis is the invalid columns
         </span><span class="kw">let </span>columns = <span class="macro">vec!</span>[<span class="string">"Nombre"</span>.to_string(), <span class="string">"Edad"</span>.to_string()];
@@ -1038,6 +1089,31 @@
         // so we are trying to sort by a column that does not exist
         </span><span class="kw">let </span>result = table.resolve_select(columns, conditions, sorting);
         <span class="macro">assert_eq!</span>(result.is_err(), <span class="bool-val">true</span>);
+    }
+
+    <span class="attr">#[test]
+    </span><span class="kw">fn </span>return_select_returns_ok() {
+        <span class="kw">let </span><span class="kw-2">mut </span>table = Table::new(<span class="string">"./tests/database.csv"</span>).unwrap();
+
+        <span class="kw">let </span>columns = <span class="macro">vec!</span>[<span class="string">"Nombre"</span>.to_string(), <span class="string">"Edad"</span>.to_string()];
+        <span class="kw">let </span>result = table.resolve_select(columns, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>);
+        <span class="macro">assert_eq!</span>(result.is_ok(), <span class="bool-val">true</span>);
+    }
+
+    <span class="attr">#[test]
+    </span><span class="kw">fn </span>return_select_returns_ok_with_conditions() {
+        <span class="kw">let </span><span class="kw-2">mut </span>table = Table::new(<span class="string">"./tests/database.csv"</span>).unwrap();
+
+        <span class="kw">let </span>columns = <span class="macro">vec!</span>[<span class="string">"Nombre"</span>.to_string(), <span class="string">"Edad"</span>.to_string()];
+        <span class="kw">let </span>conditions = <span class="prelude-val">Some</span>(<span class="string">"Nombre = 'Luis' AND Edad = 29"</span>);
+        <span class="kw">let </span>result = table.resolve_select(columns, conditions, <span class="prelude-val">None</span>).unwrap();
+
+        <span class="kw">let </span>expected_result = <span class="macro">vec!</span>[
+            <span class="macro">vec!</span>[<span class="string">"Nombre"</span>.to_string(), <span class="string">"Edad"</span>.to_string()],
+            <span class="macro">vec!</span>[<span class="string">"Luis"</span>.to_string(), <span class="string">"29"</span>.to_string()],
+        ];
+
+        <span class="macro">assert_eq!</span>(result, expected_result);
     }
 }
 </code></pre></div></section></main></body></html>

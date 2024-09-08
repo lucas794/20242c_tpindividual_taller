@@ -303,18 +303,6 @@
 <a href="#303" id="303">303</a>
 <a href="#304" id="304">304</a>
 <a href="#305" id="305">305</a>
-<a href="#306" id="306">306</a>
-<a href="#307" id="307">307</a>
-<a href="#308" id="308">308</a>
-<a href="#309" id="309">309</a>
-<a href="#310" id="310">310</a>
-<a href="#311" id="311">311</a>
-<a href="#312" id="312">312</a>
-<a href="#313" id="313">313</a>
-<a href="#314" id="314">314</a>
-<a href="#315" id="315">315</a>
-<a href="#316" id="316">316</a>
-<a href="#317" id="317">317</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{
     fs,
     io::{<span class="self">self</span>, Write},
@@ -330,14 +318,36 @@
 
 <span class="doccomment">/// implementation of the select query
 /// select uses query general validator
-</span><span class="kw">impl </span>Select {
+///
+</span><span class="kw">impl </span>Default <span class="kw">for </span>Select {
+    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+        Select::new()
+    }
+}
+<span class="kw">impl </span>Default <span class="kw">for </span>Insert {
+    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+        Insert::new()
+    }
+}
+<span class="kw">impl </span>Default <span class="kw">for </span>Update {
+    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+        Update::new()
+    }
+}
+<span class="kw">impl </span>Default <span class="kw">for </span>Delete {
+    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+        Delete::new()
+    }
+}
+
+<span class="kw">impl </span>Select {
     <span class="kw">pub fn </span>new() -&gt; Select {
         Select
     }
 
     <span class="doccomment">/// A valid select query contains SELECT and FROM AND ends with ;
     /// if the query is valid, it will return true
-    </span><span class="kw">pub fn </span>is_valid_query&lt;<span class="lifetime">'a</span>&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, query: <span class="kw-2">&amp;</span><span class="lifetime">'a </span>str) -&gt; bool {
+    </span><span class="kw">pub fn </span>is_valid_query(<span class="kw-2">&amp;</span><span class="self">self</span>, query: <span class="kw-2">&amp;</span>str) -&gt; bool {
         <span class="kw">let </span>query = query.trim();
 
         <span class="kw">if </span>query.starts_with(<span class="string">"SELECT"</span>) &amp;&amp; query.contains(<span class="string">"FROM"</span>) {
@@ -370,13 +380,13 @@
 
                 <span class="kw">for </span>line <span class="kw">in </span>data {
                     <span class="kw">let </span><span class="kw-2">mut </span>temp_line = line.join(<span class="string">","</span>);
-                    temp_line.push_str(<span class="string">"\n"</span>);
+                    temp_line.push(<span class="string">'\n'</span>);
                     <span class="kw">let _ </span>= handle.write(temp_line.as_bytes());
                 }
                 <span class="prelude-val">Ok</span>(())
             }
             <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
-                <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::InvalidSyntax(<span class="string">"Invalid columns inside the query"</span>));
+                <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::Syntax(<span class="string">"Invalid columns inside the query"</span>));
             }
         }
     }
@@ -389,7 +399,7 @@
 
     <span class="doccomment">/// A valid INSERT query contains INSERT INTO and VALUES AND ends with ;
     /// if the query is valid, it will return true
-    </span><span class="kw">pub fn </span>is_valid_query&lt;<span class="lifetime">'a</span>&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, query: <span class="kw-2">&amp;</span><span class="lifetime">'a </span>str) -&gt; bool {
+    </span><span class="kw">pub fn </span>is_valid_query(<span class="kw-2">&amp;</span><span class="self">self</span>, query: <span class="kw-2">&amp;</span>str) -&gt; bool {
         <span class="kw">let </span>query = query.trim();
 
         <span class="kw">if </span>query.starts_with(<span class="string">"INSERT INTO"</span>) &amp;&amp; query.contains(<span class="string">"VALUES"</span>) {
@@ -413,18 +423,16 @@
         <span class="kw">match </span>resolve {
             <span class="prelude-val">Ok</span>(line) =&gt; {
                 <span class="kw">let </span><span class="kw-2">mut </span>line = line.join(<span class="string">","</span>);
-                line.push_str(<span class="string">"\n"</span>);
+                line.push(<span class="string">'\n'</span>);
                 <span class="kw">match </span>table.insert_line_to_csv(line) {
-                    <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; {
-                        <span class="kw">return </span><span class="prelude-val">Ok</span>(());
-                    }
+                    <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Ok</span>(()),
                     <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
-                        <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::InvalidGeneric(<span class="string">"Error while inserting line"</span>));
+                        <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::Generic(<span class="string">"Error while inserting line"</span>));
                     }
                 }
             }
             <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
-                <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::InvalidGeneric(
+                <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::Generic(
                     <span class="string">"Invalid columns inside the query / mismatch with the table"</span>,
                 ));
             }
@@ -441,7 +449,7 @@
     /// if the query is valid, it will return true
     /// UPDATE table_name SET column1 = value1, column2 = value2 WHERE condition;
     /// UPDATE table_name SET column1 = value1, column2 = value2;
-    </span><span class="kw">pub fn </span>is_valid_query&lt;<span class="lifetime">'a</span>&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, query: <span class="kw-2">&amp;</span><span class="lifetime">'a </span>str) -&gt; bool {
+    </span><span class="kw">pub fn </span>is_valid_query(<span class="kw-2">&amp;</span><span class="self">self</span>, query: <span class="kw-2">&amp;</span>str) -&gt; bool {
         <span class="kw">let </span>query = query.trim();
 
         <span class="kw">if </span>query.starts_with(<span class="string">"UPDATE"</span>) &amp;&amp; query.contains(<span class="string">"SET"</span>) {
@@ -467,53 +475,28 @@
                 <span class="comment">// we need to make a shift of files
                 // temporal file should be renamed to the original file name
                 // and the original file should be deleted
-                </span><span class="kw">let </span>file_directory = table.get_file_directory();
 
-                <span class="kw">let </span>file_name = <span class="kw">match </span>table.get_file_name() {
-                    <span class="prelude-val">Ok</span>(file_name) =&gt; file_name,
-                    <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
-                        <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::InvalidGeneric(
-                            <span class="string">"Error getting the name of the file to update"</span>,
-                        ));
-                    }
-                };
-                <span class="comment">// lets close the file
+                </span><span class="kw">let </span>original_file = table.get_file_directory();
+                <span class="kw">let </span>replacement =
+                    <span class="macro">format!</span>(<span class="string">"{}/temporal_file.csv"</span>, table.get_directory_where_file_is());
 
-                // we need to delete the original file
-                </span><span class="kw">match </span>fs::remove_file(file_directory) {
+                <span class="kw">match </span>fs::remove_file(original_file) {
                     <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; {}
                     <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
-                        <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::InvalidGeneric(
-                            <span class="string">"Error while deleting the original file"</span>,
-                        ));
-                    }
-                }
-                <span class="comment">// the directory is until the last / is found
-                </span><span class="kw">let </span>pos_last_backlash = <span class="kw">match </span>file_directory.rfind(<span class="string">'/'</span>) {
-                    <span class="prelude-val">Some</span>(pos) =&gt; pos,
-                    <span class="prelude-val">None </span>=&gt; <span class="number">0</span>,
-                };
-
-                <span class="kw">let </span>temp_file_name =
-                    <span class="macro">format!</span>(<span class="string">"{}/temp_file.csv"</span>, <span class="kw-2">&amp;</span>file_directory[<span class="number">0</span>..pos_last_backlash]);
-                <span class="kw">let </span>oficial_file_name = <span class="macro">format!</span>(
-                    <span class="string">"{}/{}.csv"</span>,
-                    <span class="kw-2">&amp;</span>file_directory[<span class="number">0</span>..pos_last_backlash],
-                    file_name
-                );
-                <span class="kw">match </span>fs::rename(<span class="kw-2">&amp;</span>temp_file_name, <span class="kw-2">&amp;</span>oficial_file_name) {
-                    <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; {}
-                    <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
-                        <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::InvalidGeneric(
-                            <span class="string">"Error while renaming the temporal file"</span>,
-                        ));
+                        <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::Generic(<span class="string">"Error while deleting the original file"</span>));
                     }
                 }
 
-                <span class="kw">return </span><span class="prelude-val">Ok</span>(());
+                <span class="kw">match </span>fs::rename(replacement, original_file) {
+                    <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; {}
+                    <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
+                        <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::Generic(<span class="string">"Error while renaming the temporal file"</span>));
+                    }
+                }
+                <span class="prelude-val">Ok</span>(())
             }
             <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
-                <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::InvalidSyntax(<span class="string">"Invalid columns inside the query"</span>));
+                <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::Syntax(<span class="string">"Invalid columns inside the query"</span>));
             }
         }
     }
@@ -524,7 +507,7 @@
         Delete
     }
 
-    <span class="kw">pub fn </span>is_valid_query&lt;<span class="lifetime">'a</span>&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, query: <span class="kw-2">&amp;</span><span class="lifetime">'a </span>str) -&gt; bool {
+    <span class="kw">pub fn </span>is_valid_query(<span class="kw-2">&amp;</span><span class="self">self</span>, query: <span class="kw-2">&amp;</span>str) -&gt; bool {
         <span class="kw">let </span>query = query.trim();
 
         <span class="kw">if </span>query.starts_with(<span class="string">"DELETE"</span>) &amp;&amp; query.contains(<span class="string">"FROM"</span>) {
@@ -553,7 +536,7 @@
                 <span class="kw">let </span>file_name = <span class="kw">match </span>table.get_file_name() {
                     <span class="prelude-val">Ok</span>(file_name) =&gt; file_name,
                     <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
-                        <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::InvalidGeneric(
+                        <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::Generic(
                             <span class="string">"Error getting the name of the file to update"</span>,
                         ));
                     }
@@ -564,17 +547,12 @@
                 </span><span class="kw">match </span>fs::remove_file(file_directory) {
                     <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; {}
                     <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
-                        <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::InvalidGeneric(
-                            <span class="string">"Error while deleting the original file"</span>,
-                        ));
+                        <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::Generic(<span class="string">"Error while deleting the original file"</span>));
                     }
                 }
 
                 <span class="comment">// the directory is until the last / is found
-                </span><span class="kw">let </span>pos_last_backlash = <span class="kw">match </span>file_directory.rfind(<span class="string">'/'</span>) {
-                    <span class="prelude-val">Some</span>(pos) =&gt; pos,
-                    <span class="prelude-val">None </span>=&gt; <span class="number">0</span>,
-                };
+                </span><span class="kw">let </span>pos_last_backlash = file_directory.rfind(<span class="string">'/'</span>).unwrap_or(<span class="number">0</span>);
 
                 <span class="kw">let </span>temp_file_name =
                     <span class="macro">format!</span>(<span class="string">"{}/temp_file.csv"</span>, <span class="kw-2">&amp;</span>file_directory[<span class="number">0</span>..pos_last_backlash]);
@@ -586,16 +564,14 @@
                 <span class="kw">match </span>fs::rename(<span class="kw-2">&amp;</span>temp_file_name, <span class="kw-2">&amp;</span>oficial_file_name) {
                     <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; {}
                     <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
-                        <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::InvalidGeneric(
-                            <span class="string">"Error while renaming the temporal file"</span>,
-                        ));
+                        <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::Generic(<span class="string">"Error while renaming the temporal file"</span>));
                     }
                 }
 
-                <span class="kw">return </span><span class="prelude-val">Ok</span>(());
+                <span class="prelude-val">Ok</span>(())
             }
             <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
-                <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::InvalidSyntax(<span class="string">"Invalid columns inside the query"</span>));
+                <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::Syntax(<span class="string">"Invalid columns inside the query"</span>));
             }
         }
     }
@@ -606,7 +582,7 @@
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
     <span class="attr">#[test]
-    </span><span class="kw">fn </span>select_invalid_query() {
+    </span><span class="kw">fn </span>select_invalid_query_throws_error() {
         <span class="kw">let </span>select = Select::new();
         <span class="kw">let </span>invalid_consults: Vec&lt;<span class="kw-2">&amp;</span>str&gt; = Vec::from([
             <span class="string">"name, age FROM table"</span>,    <span class="comment">// missing select
@@ -620,7 +596,7 @@
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>execute_select_fails_with_invalid_columns() {
-        <span class="kw">let </span><span class="kw-2">mut </span>table = Table::new(<span class="string">"./test.csv"</span>).unwrap();
+        <span class="kw">let </span><span class="kw-2">mut </span>table = Table::new(<span class="string">"./tests/database.csv"</span>).unwrap();
         <span class="kw">let </span>select = Select::new();
         <span class="comment">// i'm trying to select a column that does not exist
         </span><span class="kw">let </span>columns = <span class="macro">vec!</span>[<span class="string">"Trabajo Profesional"</span>.to_string()];

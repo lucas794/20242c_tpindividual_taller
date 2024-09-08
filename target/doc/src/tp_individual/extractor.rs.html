@@ -507,53 +507,22 @@
 <a href="#507" id="507">507</a>
 <a href="#508" id="508">508</a>
 <a href="#509" id="509">509</a>
-<a href="#510" id="510">510</a>
-<a href="#511" id="511">511</a>
-<a href="#512" id="512">512</a>
-<a href="#513" id="513">513</a>
-<a href="#514" id="514">514</a>
-<a href="#515" id="515">515</a>
-<a href="#516" id="516">516</a>
-<a href="#517" id="517">517</a>
-<a href="#518" id="518">518</a>
-<a href="#519" id="519">519</a>
-<a href="#520" id="520">520</a>
-<a href="#521" id="521">521</a>
-<a href="#522" id="522">522</a>
-<a href="#523" id="523">523</a>
-<a href="#524" id="524">524</a>
-<a href="#525" id="525">525</a>
-<a href="#526" id="526">526</a>
-<a href="#527" id="527">527</a>
-<a href="#528" id="528">528</a>
-<a href="#529" id="529">529</a>
-<a href="#530" id="530">530</a>
-<a href="#531" id="531">531</a>
-<a href="#532" id="532">532</a>
-<a href="#533" id="533">533</a>
-<a href="#534" id="534">534</a>
-<a href="#535" id="535">535</a>
-<a href="#536" id="536">536</a>
-<a href="#537" id="537">537</a>
-<a href="#538" id="538">538</a>
-<a href="#539" id="539">539</a>
-<a href="#540" id="540">540</a>
-<a href="#541" id="541">541</a>
-<a href="#542" id="542">542</a>
-<a href="#543" id="543">543</a>
-<a href="#544" id="544">544</a>
-<a href="#545" id="545">545</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::errors::TPErrors;
 
 <span class="kw">pub struct </span>Extractor;
 
 <span class="kw">pub enum </span>SQLCommand {
-    SELECT,
-    INSERT,
-    UPDATE,
-    DELETE,
+    Select,
+    Insert,
+    Update,
+    Delete,
 }
 
+<span class="kw">impl </span>Default <span class="kw">for </span>Extractor {
+    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+        Extractor::new()
+    }
+}
 <span class="kw">impl </span>Extractor {
     <span class="kw">pub fn </span>new() -&gt; Extractor {
         Extractor
@@ -563,9 +532,9 @@
     /// Example
     /// SELECT name, age FROM table;
     /// Returns ["name", "age"]
-    </span><span class="kw">pub fn </span>extract_columns_for_select&lt;<span class="lifetime">'a</span>&gt;(
+    </span><span class="kw">pub fn </span>extract_columns_for_select(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        query: <span class="kw-2">&amp;</span><span class="lifetime">'a </span>str,
+        query: <span class="kw-2">&amp;</span>str,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;String&gt;, TPErrors&lt;<span class="lifetime">'static</span>&gt;&gt; {
         <span class="kw">let </span>query = query.trim();
 
@@ -588,32 +557,26 @@
                 <span class="prelude-val">Ok</span>(columns)
             }
             <span class="prelude-val">None </span>=&gt; {
-                <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::InvalidSyntax(
-                    <span class="string">"Invalid select query (Missing FROM)"</span>,
-                ));
+                <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::Syntax(<span class="string">"Invalid select query (Missing FROM)"</span>));
             }
         }
     }
 
-    <span class="kw">pub fn </span>extract_columns_and_values_for_insert&lt;<span class="lifetime">'a</span>&gt;(
+    <span class="kw">pub fn </span>extract_columns_and_values_for_insert(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        query: <span class="kw-2">&amp;</span><span class="lifetime">'a </span>str,
+        query: <span class="kw-2">&amp;</span>str,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(Vec&lt;String&gt;, Vec&lt;String&gt;), TPErrors&lt;<span class="lifetime">'static</span>&gt;&gt; {
         <span class="kw">let </span>(start_columns, end_columns) = <span class="kw">match </span>(query.find(<span class="string">"("</span>), query.find(<span class="string">")"</span>)) {
             (<span class="prelude-val">Some</span>(start), <span class="prelude-val">Some</span>(end)) =&gt; (start, end),
             <span class="kw">_ </span>=&gt; {
-                <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::InvalidSyntax(
-                    <span class="string">"Invalid INSERT query (Missing columns)"</span>,
-                ));
+                <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::Syntax(<span class="string">"Invalid INSERT query (Missing columns)"</span>));
             }
         };
 
         <span class="kw">let </span>(start_values, end_values) = <span class="kw">match </span>(query.rfind(<span class="string">"("</span>), query.rfind(<span class="string">")"</span>)) {
             (<span class="prelude-val">Some</span>(start), <span class="prelude-val">Some</span>(end)) =&gt; (start, end),
             <span class="kw">_ </span>=&gt; {
-                <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::InvalidSyntax(
-                    <span class="string">"Invalid INSERT query (Missing values)"</span>,
-                ));
+                <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::Syntax(<span class="string">"Invalid INSERT query (Missing values)"</span>));
             }
         };
 
@@ -640,7 +603,7 @@
 
         <span class="comment">// if len doesnt match we return an error
         </span><span class="kw">if </span>columns.len() != values.len() {
-            <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::InvalidSyntax(
+            <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::Syntax(
                 <span class="string">"Invalid INSERT query (Columns and values do not match)"</span>,
             ));
         }
@@ -648,14 +611,15 @@
         <span class="prelude-val">Ok</span>((columns, values))
     }
 
-    <span class="kw">pub fn </span>extract_columns_and_values_for_update&lt;<span class="lifetime">'a</span>&gt;(
+    <span class="kw">pub fn </span>extract_columns_and_values_for_update(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        query: <span class="kw-2">&amp;</span><span class="lifetime">'a </span>str,
+        query: <span class="kw-2">&amp;</span>str,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(Vec&lt;String&gt;, Vec&lt;String&gt;), TPErrors&lt;<span class="lifetime">'static</span>&gt;&gt; {
         <span class="kw">let </span>(start_columns, end_columns) = <span class="kw">match </span>(query.find(<span class="string">"SET"</span>), query.find(<span class="string">"WHERE"</span>)) {
             (<span class="prelude-val">Some</span>(start), <span class="prelude-val">Some</span>(end)) =&gt; (start, end),
-            <span class="kw">_ </span>=&gt; {
-                <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::InvalidSyntax(
+            (<span class="prelude-val">Some</span>(start), <span class="prelude-val">None</span>) =&gt; (start, query.len() - <span class="number">1</span>), <span class="comment">// no WHERE, it means ALL tables.., risky..
+            </span><span class="kw">_ </span>=&gt; {
+                <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::Syntax(
                     <span class="string">"Invalid UPDATE query (Missing SET or WHERE)"</span>,
                 ));
             }
@@ -678,7 +642,7 @@
             <span class="kw">let </span>what_to_update = what_to_update.split(<span class="string">'='</span>).collect::&lt;Vec&lt;<span class="kw-2">&amp;</span>str&gt;&gt;();
 
             <span class="kw">if </span>what_to_update.len() != <span class="number">2 </span>{
-                <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::InvalidSyntax(<span class="string">"Invalid UPDATE query (Missing =)"</span>));
+                <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::Syntax(<span class="string">"Invalid UPDATE query (Missing =)"</span>));
             }
 
             <span class="kw">let </span>column = what_to_update[<span class="number">0</span>].trim().to_string();
@@ -705,7 +669,7 @@
 
         <span class="kw">match </span>(start, end) {
             (<span class="number">0</span>, <span class="number">0</span>) =&gt; {
-                <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::InvalidSyntax(
+                <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::Syntax(
                     <span class="string">"Invalid query (Missing any KEY words on your consult)"</span>,
                 ));
             }
@@ -715,65 +679,31 @@
                 <span class="prelude-val">Ok</span>(table_data)
             }
         }
-
-        <span class="comment">/*let from_pos = query.find("FROM");
-        let where_or_end_consult_pos = query
-            .find("WHERE")
-            .or(query.find("ORDER"))
-            .or(query.find(";"));
-        // we either find WHERE, ORDER and lastly, ;, if not present, query is invalid.
-
-        match (from_pos, where_or_end_consult_pos) {
-            (Some(position_from), Some(position_where)) =&gt; {
-                let table_data = &amp;query[position_from + "FROM".len()..position_where];
-                let table_data = table_data.trim();
-                Ok(table_data)
-            }
-            _ =&gt; {
-                if where_or_end_consult_pos.is_none() {
-                    return Err(TPErrors::InvalidSyntax(
-                        "Invalid select query (Missing WHERE or ;)",
-                    ));
-                }
-                return Err(TPErrors::InvalidSyntax(
-                    "Invalid select query (Missing FROM)",
-                ));
-            }
-        }*/
-    </span>}
+    }
 
     <span class="doccomment">/// Extracts the position from a QUERY to get the table name
     /// Examples. SELECT * FROM users WHERE id = 3; -&gt; gets FROM as start and WHERE as end, offset will be the length of FROM
     /// INSERT INTO users (name, age) VALUES ('John', 20); -&gt; gets INTO as start and ( as end, offset will be the length of INTO
     /// UPDATE users SET name = 'John' WHERE id = 3; -&gt; gets UPDATE as start and SET as end, offset will be the length of UPDATE
     /// DELETE FROM users WHERE id = 3; -&gt; gets DELETE as start and FROM as end, offset will be the length of DELETE
-    </span><span class="kw">fn </span>extract_positions&lt;<span class="lifetime">'a</span>&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, query: <span class="kw-2">&amp;</span><span class="lifetime">'a </span>str, consult: SQLCommand) -&gt; (usize, usize, usize) {
+    </span><span class="kw">fn </span>extract_positions(<span class="kw-2">&amp;</span><span class="self">self</span>, query: <span class="kw-2">&amp;</span>str, consult: SQLCommand) -&gt; (usize, usize, usize) {
         <span class="kw">let </span>query = query.trim();
 
         <span class="kw">let </span>start = <span class="kw">match </span>consult {
-            SQLCommand::SELECT | SQLCommand::DELETE =&gt; <span class="kw">match </span>query.find(<span class="string">"FROM"</span>) {
-                <span class="prelude-val">Some</span>(pos) =&gt; pos,
-                <span class="prelude-val">None </span>=&gt; <span class="number">0</span>,
-            },
-            SQLCommand::INSERT =&gt; <span class="kw">match </span>query.find(<span class="string">"INTO"</span>) {
-                <span class="prelude-val">Some</span>(pos) =&gt; pos,
-                <span class="prelude-val">None </span>=&gt; <span class="number">0</span>,
-            },
-            SQLCommand::UPDATE =&gt; <span class="kw">match </span>query.find(<span class="string">"UPDATE"</span>) {
-                <span class="prelude-val">Some</span>(pos) =&gt; pos,
-                <span class="prelude-val">None </span>=&gt; <span class="number">0</span>,
-            },
+            SQLCommand::Select | SQLCommand::Delete =&gt; query.find(<span class="string">"FROM"</span>).unwrap_or(<span class="number">0</span>),
+            SQLCommand::Insert =&gt; query.find(<span class="string">"INTO"</span>).unwrap_or(<span class="number">0</span>),
+            SQLCommand::Update =&gt; query.find(<span class="string">"UPDATE"</span>).unwrap_or(<span class="number">0</span>),
         };
 
         <span class="kw">let </span>offset = <span class="kw">match </span>consult {
-            SQLCommand::SELECT =&gt; <span class="string">"FROM"</span>.len(),
-            SQLCommand::INSERT =&gt; <span class="string">"INTO"</span>.len(),
-            SQLCommand::UPDATE =&gt; <span class="string">"UPDATE"</span>.len(),
-            SQLCommand::DELETE =&gt; <span class="string">"FROM"</span>.len(),
+            SQLCommand::Select =&gt; <span class="string">"FROM"</span>.len(),
+            SQLCommand::Insert =&gt; <span class="string">"INTO"</span>.len(),
+            SQLCommand::Update =&gt; <span class="string">"UPDATE"</span>.len(),
+            SQLCommand::Delete =&gt; <span class="string">"FROM"</span>.len(),
         };
 
         <span class="kw">let </span>end = <span class="kw">match </span>consult {
-            SQLCommand::SELECT =&gt; {
+            SQLCommand::Select =&gt; {
                 <span class="kw">match </span>query.find(<span class="string">"WHERE"</span>) {
                     <span class="comment">// we need to find WHERE, ORDER or ;
                     </span><span class="prelude-val">Some</span>(pos) =&gt; pos,
@@ -783,26 +713,27 @@
                             <span class="prelude-val">Some</span>(pos) =&gt; pos,
                             <span class="prelude-val">None </span>=&gt; {
                                 <span class="comment">// NO ORDER, so we need to find ;
-                                </span><span class="kw">match </span>query.find(<span class="string">";"</span>) {
-                                    <span class="prelude-val">Some</span>(pos) =&gt; pos,
-                                    <span class="prelude-val">None </span>=&gt; <span class="number">0</span>, <span class="comment">// At this point, this should never happen since we checked before.
-                                </span>}
+                                </span>query.find(<span class="string">";"</span>).unwrap_or(<span class="number">0</span>)
                             }
                         }
                     }
                 }
             }
-            SQLCommand::INSERT =&gt; <span class="kw">match </span>query.find(<span class="string">"("</span>) {
+            SQLCommand::Insert =&gt; {
+                query.find(<span class="string">"("</span>).unwrap_or(<span class="number">0</span>)
+                <span class="comment">/*let possible_end = query.find("(").unwrap_or(0);
+                let values_start = query.find("VALUES").unwrap_or(0);
+
+                if possible_end &lt; values_start {
+                    possible_end
+                } else {
+                    values_start
+                }*/
+            </span>}
+            SQLCommand::Update =&gt; query.find(<span class="string">"SET"</span>).unwrap_or(<span class="number">0</span>),
+            SQLCommand::Delete =&gt; <span class="kw">match </span>query.find(<span class="string">"WHERE"</span>) {
                 <span class="prelude-val">Some</span>(pos) =&gt; pos,
-                <span class="prelude-val">None </span>=&gt; <span class="number">0</span>,
-            },
-            SQLCommand::UPDATE =&gt; <span class="kw">match </span>query.find(<span class="string">"SET"</span>) {
-                <span class="prelude-val">Some</span>(pos) =&gt; pos,
-                <span class="prelude-val">None </span>=&gt; <span class="number">0</span>,
-            },
-            SQLCommand::DELETE =&gt; <span class="kw">match </span>query.find(<span class="string">"WHERE"</span>) {
-                <span class="prelude-val">Some</span>(pos) =&gt; pos,
-                <span class="prelude-val">None </span>=&gt; query.find(<span class="string">";"</span>).unwrap(),
+                <span class="prelude-val">None </span>=&gt; query.find(<span class="string">";"</span>).unwrap_or(<span class="number">0</span>),
             },
         };
         (start, offset, end)
@@ -860,14 +791,11 @@
         str_orderby
             .split(<span class="string">','</span>)
             .map(|part| {
-                <span class="kw">let </span>parts: Vec&lt;<span class="kw-2">&amp;</span>str&gt; = part.trim().split_whitespace().collect();
+                <span class="kw">let </span>parts: Vec&lt;<span class="kw-2">&amp;</span>str&gt; = part.split_whitespace().collect();
                 <span class="kw">let </span>column = parts[<span class="number">0</span>].to_string();
                 <span class="comment">// Default to ascending order if no direction is specified
-                </span><span class="kw">let </span>asc = <span class="kw">if </span>parts.len() == <span class="number">2 </span>&amp;&amp; parts[<span class="number">1</span>].eq(<span class="string">"DESC"</span>) {
-                    <span class="bool-val">false
-                </span>} <span class="kw">else </span>{
-                    <span class="bool-val">true
-                </span>};
+                // clippy witch.
+                </span><span class="kw">let </span>asc = !(parts.len() == <span class="number">2 </span>&amp;&amp; parts[<span class="number">1</span>].eq(<span class="string">"DESC"</span>));
                 (column, asc)
             })
             .collect()
@@ -901,7 +829,7 @@
 
         <span class="kw">for </span>consult <span class="kw">in </span>consults {
             <span class="kw">let </span>table = extractor
-                .extract_table(consult, SQLCommand::SELECT)
+                .extract_table(consult, SQLCommand::Select)
                 .unwrap();
             <span class="macro">assert_eq!</span>(table, <span class="string">"table"</span>);
         }
@@ -1005,16 +933,16 @@
         <span class="kw">let </span><span class="kw-2">mut </span>end;
         <span class="kw">let </span>i = <span class="number">0</span>;
 
-        (start, offset, end) = extractor.extract_positions(consults[i], SQLCommand::SELECT);
+        (start, offset, end) = extractor.extract_positions(consults[i], SQLCommand::Select);
         <span class="macro">assert_eq!</span>((start, offset, end), expected[i]);
 
-        (start, offset, end) = extractor.extract_positions(consults[i + <span class="number">1</span>], SQLCommand::INSERT);
+        (start, offset, end) = extractor.extract_positions(consults[i + <span class="number">1</span>], SQLCommand::Insert);
         <span class="macro">assert_eq!</span>((start, offset, end), expected[i + <span class="number">1</span>]);
 
-        (start, offset, end) = extractor.extract_positions(consults[i + <span class="number">2</span>], SQLCommand::UPDATE);
+        (start, offset, end) = extractor.extract_positions(consults[i + <span class="number">2</span>], SQLCommand::Update);
         <span class="macro">assert_eq!</span>((start, offset, end), expected[i + <span class="number">2</span>]);
 
-        (start, offset, end) = extractor.extract_positions(consults[i + <span class="number">3</span>], SQLCommand::DELETE);
+        (start, offset, end) = extractor.extract_positions(consults[i + <span class="number">3</span>], SQLCommand::Delete);
         <span class="macro">assert_eq!</span>((start, offset, end), expected[i + <span class="number">3</span>]);
     }
 
@@ -1028,23 +956,23 @@
         <span class="kw">let </span>consult_delete = <span class="string">"DELETE FROM users WHERE id = 3;"</span>;
 
         <span class="kw">let </span>table_select = extractor
-            .extract_table(consult_select, SQLCommand::INSERT)
+            .extract_table(consult_select, SQLCommand::Insert)
             .unwrap();
         <span class="macro">assert_eq!</span>(table_select, <span class="string">"users"</span>);
 
         <span class="kw">let </span>table_insert = extractor
-            .extract_table(consult_insert, SQLCommand::SELECT)
+            .extract_table(consult_insert, SQLCommand::Select)
             .unwrap();
 
         <span class="macro">assert_eq!</span>(table_insert, <span class="string">"users"</span>);
 
         <span class="kw">let </span>table_update = extractor
-            .extract_table(consult_update, SQLCommand::UPDATE)
+            .extract_table(consult_update, SQLCommand::Update)
             .unwrap();
         <span class="macro">assert_eq!</span>(table_update, <span class="string">"users"</span>);
 
         <span class="kw">let </span>table_delete = extractor
-            .extract_table(consult_delete, SQLCommand::DELETE)
+            .extract_table(consult_delete, SQLCommand::Delete)
             .unwrap();
 
         <span class="macro">assert_eq!</span>(table_delete, <span class="string">"users"</span>);
