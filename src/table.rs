@@ -212,19 +212,21 @@ impl<'a> Table<'a> {
 
         let splitted_columns = index_columns.split(",").collect::<Vec<&str>>();
 
-        let temp_index = splitted_columns
+        // if the column IS the same as values, this means that the columns weren't send on the query.
+        let temp_index = if columns != values { 
+            splitted_columns
             .iter()
             .enumerate()
             .filter(|(_i, c)| columns.contains(&c.to_string()))
             .map(|(i, _c)| i)
-            .collect::<Vec<usize>>();
-
-        let bool_missing_table = columns
-            .iter()
-            .any(|c| !splitted_columns.contains(&c.as_str()));
+            .collect::<Vec<usize>>()
+        } else {
+            (0..splitted_columns.len()).collect::<Vec<usize>>()
+        };
 
         // columns != temp_index OR the table doesn't exist in the csv file.
-        if columns.len() != temp_index.len() || bool_missing_table {
+        if columns.len() != temp_index.len() {
+            println!("This is failing");
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 "Invalid columns",

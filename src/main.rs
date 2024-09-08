@@ -145,7 +145,6 @@ fn run(args: Vec<String>) -> Result<(), errors::TPErrors<'static>> {
                     return Err(e);
                 }
             };
-
             let result = insert.execute_insert(&mut table, columns, values);
 
             if result.is_err() {

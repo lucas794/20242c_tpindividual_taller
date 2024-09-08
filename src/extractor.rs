@@ -77,7 +77,7 @@ impl Extractor {
         // Parse the columns and values into vectors
         let columns: Vec<String> = columns_str
             .split(',')
-            .map(|s| s.trim().to_string())
+            .map(|s| s.trim_matches('\'').trim().to_string())
             .collect();
 
         let values: Vec<String> = values_str
@@ -87,7 +87,7 @@ impl Extractor {
                 if trimmed.is_empty() {
                     "".to_string()
                 } else {
-                    trimmed.trim_matches('\'').to_string()
+                    trimmed.trim_matches('\'').trim().to_string()
                 }
             })
             .collect();
@@ -211,15 +211,15 @@ impl Extractor {
                 }
             }
             SQLCommand::Insert => {
-                query.find("(").unwrap_or(0)
-                /*let possible_end = query.find("(").unwrap_or(0);
+                //query.find("(").unwrap_or(0)
+                let possible_end = query.find("(").unwrap_or(0);
                 let values_start = query.find("VALUES").unwrap_or(0);
 
                 if possible_end < values_start {
                     possible_end
                 } else {
                     values_start
-                }*/
+                }
             }
             SQLCommand::Update => query.find("SET").unwrap_or(0),
             SQLCommand::Delete => match query.find("WHERE") {
