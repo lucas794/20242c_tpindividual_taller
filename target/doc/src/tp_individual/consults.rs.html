@@ -266,23 +266,10 @@
 <a href="#266" id="266">266</a>
 <a href="#267" id="267">267</a>
 <a href="#268" id="268">268</a>
-<a href="#269" id="269">269</a>
-<a href="#270" id="270">270</a>
-<a href="#271" id="271">271</a>
-<a href="#272" id="272">272</a>
-<a href="#273" id="273">273</a>
-<a href="#274" id="274">274</a>
-<a href="#275" id="275">275</a>
-<a href="#276" id="276">276</a>
-<a href="#277" id="277">277</a>
-<a href="#278" id="278">278</a>
-<a href="#279" id="279">279</a>
-<a href="#280" id="280">280</a>
-<a href="#281" id="281">281</a>
-<a href="#282" id="282">282</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span>std::fs;
-
-<span class="kw">use crate</span>::{errors::TPErrors, table::Table};
+</pre></div><pre class="rust"><code><span class="kw">use crate</span>::{
+    errors::{FileErrors, TPErrors},
+    table::Table,
+};
 
 <span class="doccomment">/// Select representation for the SQL query
 </span><span class="kw">pub struct </span>Select;
@@ -320,6 +307,7 @@
     }
 
     <span class="doccomment">/// A valid select query contains SELECT and FROM AND ends with ;
+    /// 
     /// if the query is valid, it will return true
     </span><span class="kw">pub fn </span>is_valid_query(<span class="kw-2">&amp;</span><span class="self">self</span>, query: <span class="kw-2">&amp;</span>str) -&gt; bool {
         <span class="kw">let </span>query = query.trim();
@@ -334,8 +322,11 @@
     </span>}
 
     <span class="doccomment">/// Given a table, columns, conditions and sorting method
+    /// 
     /// executes a SELECT query statement.
+    /// 
     /// Returns ok if the query was executed successfully
+    /// 
     </span><span class="kw">pub fn </span>execute_select(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         table: <span class="kw-2">&amp;mut </span>Table,
@@ -347,16 +338,10 @@
 
         <span class="kw">match </span>csv_data {
             <span class="prelude-val">Ok</span>(data) =&gt; {
-                <span class="comment">// lets write stdout
-                /*let stdout = io::stdout();
-
-                let mut handle = io::BufWriter::new(stdout.lock());*/
-
-                </span><span class="kw">for </span>line <span class="kw">in </span>data {
+                <span class="kw">for </span>line <span class="kw">in </span>data {
                     <span class="kw">let </span>temp_line = line.join(<span class="string">","</span>);
                     <span class="macro">println!</span>(<span class="string">"{}"</span>, temp_line);
-                    <span class="comment">//let _ = handle.write(temp_line.as_bytes());
-                </span>}
+                }
                 <span class="prelude-val">Ok</span>(())
             }
             <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
@@ -372,6 +357,7 @@
     }
 
     <span class="doccomment">/// A valid INSERT query contains INSERT INTO and VALUES AND ends with ;
+    /// 
     /// if the query is valid, it will return true
     </span><span class="kw">pub fn </span>is_valid_query(<span class="kw-2">&amp;</span><span class="self">self</span>, query: <span class="kw-2">&amp;</span>str) -&gt; bool {
         <span class="kw">let </span>query = query.trim();
@@ -420,9 +406,13 @@
     }
 
     <span class="doccomment">/// A valid UPDATE query contains UPDATE and SET AND ends with ;
+    /// 
     /// if the query is valid, it will return true
+    /// 
     /// UPDATE table_name SET column1 = value1, column2 = value2 WHERE condition;
+    /// 
     /// UPDATE table_name SET column1 = value1, column2 = value2;
+    /// 
     </span><span class="kw">pub fn </span>is_valid_query(<span class="kw-2">&amp;</span><span class="self">self</span>, query: <span class="kw-2">&amp;</span>str) -&gt; bool {
         <span class="kw">let </span>query = query.trim();
 
@@ -446,27 +436,18 @@
 
         <span class="kw">match </span>resolve {
             <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; {
-                <span class="comment">// we need to make a shift of files
-                // temporal file should be renamed to the original file name
-                // and the original file should be deleted
-
-                </span><span class="kw">let </span>original_file = table.get_file_directory();
-                <span class="kw">let </span>replacement =
-                    <span class="macro">format!</span>(<span class="string">"{}/temporal_file.csv"</span>, table.get_directory_where_file_is());
-
-                <span class="kw">match </span>fs::remove_file(original_file) {
+                <span class="kw">match </span>table.replace_original_with_tempfile() {
                     <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; {}
-                    <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
-                        <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::Generic(<span class="string">"Error while deleting the original file"</span>));
-                    }
+                    <span class="prelude-val">Err</span>(e) =&gt; <span class="kw">match </span>e {
+                        FileErrors::DeletionFailed =&gt; {
+                            <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::Generic(<span class="string">"Deletion failed"</span>));
+                        }
+                        FileErrors::InvalidFile =&gt; {
+                            <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::Generic(<span class="string">"Error while updating the file"</span>));
+                        }
+                    },
                 }
 
-                <span class="kw">match </span>fs::rename(replacement, original_file) {
-                    <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; {}
-                    <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
-                        <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::Generic(<span class="string">"Error while renaming the temporal file"</span>));
-                    }
-                }
                 <span class="prelude-val">Ok</span>(())
             }
             <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
@@ -502,26 +483,18 @@
 
         <span class="kw">match </span>resolve {
             <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; {
-                <span class="comment">// we need to make a shift of files
-                // temporal file should be renamed to the original file name
-                // and the original file should be deleted
-                </span><span class="kw">let </span>original_file = table.get_file_directory();
-                <span class="kw">let </span>replacement =
-                    <span class="macro">format!</span>(<span class="string">"{}/temporal_file.csv"</span>, table.get_directory_where_file_is());
-
-                <span class="kw">match </span>fs::remove_file(original_file) {
+                <span class="kw">match </span>table.replace_original_with_tempfile() {
                     <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; {}
-                    <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
-                        <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::Generic(<span class="string">"Error while deleting the original file"</span>));
-                    }
+                    <span class="prelude-val">Err</span>(e) =&gt; <span class="kw">match </span>e {
+                        FileErrors::DeletionFailed =&gt; {
+                            <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::Generic(<span class="string">"Deletion failed"</span>));
+                        }
+                        FileErrors::InvalidFile =&gt; {
+                            <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::Generic(<span class="string">"Error while updating the file"</span>));
+                        }
+                    },
                 }
 
-                <span class="kw">match </span>fs::rename(replacement, original_file) {
-                    <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; {}
-                    <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
-                        <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::Generic(<span class="string">"Error while renaming the temporal file"</span>));
-                    }
-                }
                 <span class="prelude-val">Ok</span>(())
             }
             <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
@@ -530,7 +503,6 @@
         }
     }
 }
-
 <span class="attr">#[cfg(test)]
 </span><span class="kw">mod </span>tests {
     <span class="kw">use super</span>::<span class="kw-2">*</span>;

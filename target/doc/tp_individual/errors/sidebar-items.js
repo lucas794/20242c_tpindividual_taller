@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["TPErrors"]};
+window.SIDEBAR_ITEMS = {"enum":["FileErrors","TPErrors"]};

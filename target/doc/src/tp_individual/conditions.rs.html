@@ -208,6 +208,16 @@
 <a href="#208" id="208">208</a>
 <a href="#209" id="209">209</a>
 <a href="#210" id="210">210</a>
+<a href="#211" id="211">211</a>
+<a href="#212" id="212">212</a>
+<a href="#213" id="213">213</a>
+<a href="#214" id="214">214</a>
+<a href="#215" id="215">215</a>
+<a href="#216" id="216">216</a>
+<a href="#217" id="217">217</a>
+<a href="#218" id="218">218</a>
+<a href="#219" id="219">219</a>
+<a href="#220" id="220">220</a>
 </pre></div><pre class="rust"><code><span class="comment">// tried recursive descent parser but i lost so much time at this point.
 </span><span class="doccomment">/// representation of the type of value can be used for conditions
 
@@ -231,6 +241,11 @@
     }
 
     <span class="doccomment">/// given a condition as STR it will return if the condition is met
+    /// 
+    /// Assuming conditions holds a condition as example: ```("Name", "John")```
+    /// 
+    /// a query with "Name = 'John'" will return true
+    /// 
     </span><span class="kw">pub fn </span>matches_condition(<span class="kw-2">&amp;</span><span class="self">self</span>, conditions: <span class="kw-2">&amp;</span>str) -&gt; bool {
         <span class="kw">let </span>splitted_conditions = conditions.split_whitespace().collect::&lt;Vec&lt;<span class="kw-2">&amp;</span>str&gt;&gt;();
 
@@ -255,8 +270,8 @@
                     i += <span class="number">1</span>;
                     result =
                         result || <span class="self">self</span>.evaluate_condition(<span class="kw-2">&amp;</span>splitted_conditions, <span class="kw-2">&amp;mut </span>i, is_negated);
-                    is_negated = <span class="bool-val">false</span>; <span class="comment">// Reset negation flag after use
 
+                    is_negated = <span class="bool-val">false</span>; <span class="comment">// Reset negation flag after use
                     </span><span class="kw">if </span>result {
                         <span class="comment">// a single true in OR is enough
                         </span><span class="kw">return </span><span class="bool-val">true</span>;
@@ -286,62 +301,67 @@
         // Find the actual value of the column from the record
         </span><span class="kw">let </span>found_column = <span class="self">self</span>.data.iter().find(|(col, <span class="kw">_</span>)| col == column);
         <span class="kw">if let </span><span class="prelude-val">Some</span>((<span class="kw">_</span>, actual_value)) = found_column {
-            <span class="kw">let </span>condition_met = <span class="kw">match </span>(actual_value, <span class="kw-2">*</span>operator) {
-                (Value::String(actual), <span class="string">"="</span>) =&gt; actual == value.trim_matches(<span class="string">'\''</span>),
-                (Value::String(actual), <span class="string">"!="</span>) =&gt; actual != value.trim_matches(<span class="string">'\''</span>),
-                (Value::Integer(actual), <span class="string">"="</span>) =&gt; {
-                    <span class="kw">if let </span><span class="prelude-val">Ok</span>(val) = value.parse::&lt;i64&gt;() {
-                        actual == <span class="kw-2">&amp;</span>val
-                    } <span class="kw">else </span>{
-                        <span class="bool-val">false
-                    </span>}
-                }
-                (Value::Integer(actual), <span class="string">"!="</span>) =&gt; {
-                    <span class="kw">if let </span><span class="prelude-val">Ok</span>(val) = value.parse::&lt;i64&gt;() {
-                        actual != <span class="kw-2">&amp;</span>val
-                    } <span class="kw">else </span>{
-                        <span class="bool-val">false
-                    </span>}
-                }
-                (Value::Integer(actual), <span class="string">"&gt;"</span>) =&gt; {
-                    <span class="kw">if let </span><span class="prelude-val">Ok</span>(val) = value.parse::&lt;i64&gt;() {
-                        actual &gt; <span class="kw-2">&amp;</span>val
-                    } <span class="kw">else </span>{
-                        <span class="bool-val">false
-                    </span>}
-                }
-                (Value::Integer(actual), <span class="string">"&lt;"</span>) =&gt; {
-                    <span class="kw">if let </span><span class="prelude-val">Ok</span>(val) = value.parse::&lt;i64&gt;() {
-                        actual &lt; <span class="kw-2">&amp;</span>val
-                    } <span class="kw">else </span>{
-                        <span class="bool-val">false
-                    </span>}
-                }
-                (Value::Integer(actual), <span class="string">"&gt;="</span>) =&gt; {
-                    <span class="kw">if let </span><span class="prelude-val">Ok</span>(val) = value.parse::&lt;i64&gt;() {
-                        actual &gt;= <span class="kw-2">&amp;</span>val
-                    } <span class="kw">else </span>{
-                        <span class="bool-val">false
-                    </span>}
-                }
-                (Value::Integer(actual), <span class="string">"&lt;="</span>) =&gt; {
-                    <span class="kw">if let </span><span class="prelude-val">Ok</span>(val) = value.parse::&lt;i64&gt;() {
-                        actual &lt;= <span class="kw-2">&amp;</span>val
-                    } <span class="kw">else </span>{
-                        <span class="bool-val">false
-                    </span>}
-                }
-                <span class="kw">_ </span>=&gt; <span class="bool-val">false</span>,
-            };
+            <span class="kw">let </span>evaluation_check = <span class="self">self</span>.resolve_evaluation(actual_value, operator, value);
 
             <span class="kw">if </span>negate {
-                !condition_met
+                !evaluation_check
             } <span class="kw">else </span>{
-                condition_met
+                evaluation_check
             }
         } <span class="kw">else </span>{
             <span class="bool-val">false </span><span class="comment">// Column not found in the record
         </span>}
+    }
+
+    <span class="doccomment">/// Private function that help to check if conditions are met.
+    </span><span class="kw">fn </span>resolve_evaluation(<span class="kw-2">&amp;</span><span class="self">self</span>, actual_value: <span class="kw-2">&amp;</span>Value, operator: <span class="kw-2">&amp;</span>str, value: <span class="kw-2">&amp;</span>str) -&gt; bool {
+        <span class="kw">match </span>(actual_value, operator) {
+            (Value::String(actual), <span class="string">"="</span>) =&gt; actual == value.trim_matches(<span class="string">'\''</span>),
+            (Value::String(actual), <span class="string">"!="</span>) =&gt; actual != value.trim_matches(<span class="string">'\''</span>),
+            (Value::Integer(actual), <span class="string">"="</span>) =&gt; {
+                <span class="kw">if let </span><span class="prelude-val">Ok</span>(val) = value.parse::&lt;i64&gt;() {
+                    actual == <span class="kw-2">&amp;</span>val
+                } <span class="kw">else </span>{
+                    <span class="bool-val">false
+                </span>}
+            }
+            (Value::Integer(actual), <span class="string">"!="</span>) =&gt; {
+                <span class="kw">if let </span><span class="prelude-val">Ok</span>(val) = value.parse::&lt;i64&gt;() {
+                    actual != <span class="kw-2">&amp;</span>val
+                } <span class="kw">else </span>{
+                    <span class="bool-val">false
+                </span>}
+            }
+            (Value::Integer(actual), <span class="string">"&gt;"</span>) =&gt; {
+                <span class="kw">if let </span><span class="prelude-val">Ok</span>(val) = value.parse::&lt;i64&gt;() {
+                    actual &gt; <span class="kw-2">&amp;</span>val
+                } <span class="kw">else </span>{
+                    <span class="bool-val">false
+                </span>}
+            }
+            (Value::Integer(actual), <span class="string">"&lt;"</span>) =&gt; {
+                <span class="kw">if let </span><span class="prelude-val">Ok</span>(val) = value.parse::&lt;i64&gt;() {
+                    actual &lt; <span class="kw-2">&amp;</span>val
+                } <span class="kw">else </span>{
+                    <span class="bool-val">false
+                </span>}
+            }
+            (Value::Integer(actual), <span class="string">"&gt;="</span>) =&gt; {
+                <span class="kw">if let </span><span class="prelude-val">Ok</span>(val) = value.parse::&lt;i64&gt;() {
+                    actual &gt;= <span class="kw-2">&amp;</span>val
+                } <span class="kw">else </span>{
+                    <span class="bool-val">false
+                </span>}
+            }
+            (Value::Integer(actual), <span class="string">"&lt;="</span>) =&gt; {
+                <span class="kw">if let </span><span class="prelude-val">Ok</span>(val) = value.parse::&lt;i64&gt;() {
+                    actual &lt;= <span class="kw-2">&amp;</span>val
+                } <span class="kw">else </span>{
+                    <span class="bool-val">false
+                </span>}
+            }
+            <span class="kw">_ </span>=&gt; <span class="bool-val">false</span>,
+        }
     }
 }
 
