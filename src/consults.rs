@@ -39,7 +39,7 @@ impl Select {
     }
 
     /// A valid select query contains SELECT and FROM AND ends with ;
-    /// 
+    ///
     /// if the query is valid, it will return true
     pub fn is_valid_query(&self, query: &str) -> bool {
         let query = query.trim();
@@ -54,11 +54,11 @@ impl Select {
     }
 
     /// Given a table, columns, conditions and sorting method
-    /// 
+    ///
     /// executes a SELECT query statement.
-    /// 
+    ///
     /// Returns ok if the query was executed successfully
-    /// 
+    ///
     pub fn execute_select(
         &self,
         table: &mut Table,
@@ -89,7 +89,7 @@ impl Insert {
     }
 
     /// A valid INSERT query contains INSERT INTO and VALUES AND ends with ;
-    /// 
+    ///
     /// if the query is valid, it will return true
     pub fn is_valid_query(&self, query: &str) -> bool {
         let query = query.trim();
@@ -138,13 +138,13 @@ impl Update {
     }
 
     /// A valid UPDATE query contains UPDATE and SET AND ends with ;
-    /// 
+    ///
     /// if the query is valid, it will return true
-    /// 
+    ///
     /// UPDATE table_name SET column1 = value1, column2 = value2 WHERE condition;
-    /// 
+    ///
     /// UPDATE table_name SET column1 = value1, column2 = value2;
-    /// 
+    ///
     pub fn is_valid_query(&self, query: &str) -> bool {
         let query = query.trim();
 

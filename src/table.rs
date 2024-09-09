@@ -15,6 +15,8 @@ pub struct Table<'a> {
     file: File,
 }
 
+// lets implement a comparator to sort a vector 
+
 impl<'a> Table<'a> {
     pub fn new(file_name: &'a str) -> Result<Self, std::io::Error> {
         let file_reference = File::open(file_name);
@@ -38,11 +40,11 @@ impl<'a> Table<'a> {
     }
 
     /// Get the file name of the table
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```./path/table.csv``` -> table
-    /// 
+    ///
     /// ```./table.csv``` -> table
     pub fn get_file_name(&self) -> Result<&'a str, TPErrors<'static>> {
         let table_file = match self.file_name.split("/").last() {
@@ -67,12 +69,12 @@ impl<'a> Table<'a> {
     }
 
     /// given the columns of table, conditions as str and a sorting method
-    /// 
+    ///
     /// it will return the result of the query
-    /// 
+    ///
     /// Example: Lets assume we have a DB with Nombre,Apellido
     /// ```SELECT Nombre FROM table WHERE Apellido = 'Doe' ORDER BY Nombre ASC;```
-    /// 
+    ///
     /// The result will be a vector of vector of string (The content readed from the csv)
     pub fn resolve_select(
         &mut self,
@@ -84,22 +86,18 @@ impl<'a> Table<'a> {
         // we need to read the csv and get the columns
         // we need to print the columns
 
-        // lets read the first line of the file
-        let index_columns = std::io::BufReader::new(&self.file)
-            .lines()
-            .next()
-            .unwrap_or(Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Error reading file",
-            )))?;
-
-        let splitted_columns = index_columns.split(",").collect::<Vec<&str>>();
+        let splitted_columns_from_file = match self.get_column_from_file() {
+            Ok(columns) => columns,
+            Err(e) => {
+                return Err(e);
+            }
+        };
 
         // lets check if its a select *
         let index_columns = if columns.len() == 1 && columns[0] == "*" {
-            (0..splitted_columns.len()).collect::<Vec<usize>>()
+            (0..splitted_columns_from_file.len()).collect::<Vec<usize>>()
         } else {
-            let temp_index = splitted_columns
+            let temp_index = splitted_columns_from_file
                 .iter()
                 .enumerate()
                 .filter(|(_i, c)| columns.contains(&c.to_string()))
@@ -117,7 +115,7 @@ impl<'a> Table<'a> {
 
         let columns = if columns.len() == 1 && columns[0] == "*" {
             // we need to handle the case if its a joker *
-            splitted_columns
+            splitted_columns_from_file
                 .iter()
                 .map(|s| s.to_string())
                 .collect::<Vec<String>>()
@@ -203,37 +201,34 @@ impl<'a> Table<'a> {
     }
 
     /// given a columns and values as Vec of String
-    /// 
+    ///
     /// It returns the proper line to write in the csv
-    /// 
+    ///
     /// else returns a Error.
-    /// 
+    ///
     pub fn resolve_insert(
         &self,
         columns: Vec<String>,
         values: Vec<String>,
     ) -> Result<Vec<String>, std::io::Error> {
         // we need to check if the columns are valid
-        let index_columns = std::io::BufReader::new(&self.file)
-            .lines()
-            .next()
-            .unwrap_or(Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Error reading file",
-            )))?;
-
-        let splitted_columns = index_columns.split(",").collect::<Vec<&str>>();
+        let splitted_columns_from_file = match self.get_column_from_file() {
+            Ok(columns) => columns,
+            Err(e) => {
+                return Err(e);
+            }
+        };
 
         // if the column IS the same as values, this means that the columns weren't send on the query.
         let temp_index = if columns != values {
-            splitted_columns
+            splitted_columns_from_file
                 .iter()
                 .enumerate()
                 .filter(|(_i, c)| columns.contains(&c.to_string()))
                 .map(|(i, _c)| i)
                 .collect::<Vec<usize>>()
         } else {
-            (0..splitted_columns.len()).collect::<Vec<usize>>()
+            (0..splitted_columns_from_file.len()).collect::<Vec<usize>>()
         };
 
         // columns != temp_index OR the table doesn't exist in the csv file.
@@ -248,7 +243,7 @@ impl<'a> Table<'a> {
         // now we need to each temp_index, writ the value
         // else we write a empty string
         let mut line_to_write: Vec<String> = Vec::new();
-        for (i, _col) in splitted_columns.iter().enumerate() {
+        for (i, _col) in splitted_columns_from_file.iter().enumerate() {
             if temp_index.contains(&i) {
                 let position = match temp_index.iter().position(|&x| x == i) {
                     Some(p) => p,
@@ -269,9 +264,9 @@ impl<'a> Table<'a> {
     }
 
     /// Function that handles the resolve of the update query
-    /// 
+    ///
     /// Given the columns to update, the values to update, and the conditions as str
-    /// 
+    ///
     /// it will return the result of the query
     pub fn resolve_update(
         &mut self,
@@ -280,24 +275,21 @@ impl<'a> Table<'a> {
         opt_conditions: Option<&str>,
     ) -> Result<(), std::io::Error> {
         // we need to check if the columns are valid
-        let columns_from_csv = std::io::BufReader::new(&self.file)
-            .lines()
-            .next()
-            .unwrap_or(Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Error reading file",
-            )))?;
+        let splitted_columns_from_file = match self.get_column_from_file() {
+            Ok(columns) => columns,
+            Err(e) => {
+                return Err(e);
+            }
+        };
 
-        let splitted_columns = columns_from_csv.split(",").collect::<Vec<&str>>();
-
-        let index_selected_column = splitted_columns
+        let index_selected_column: Vec<usize> = splitted_columns_from_file
             .iter()
             .enumerate()
             .filter(|(_i, c)| columns.contains(&c.to_string()))
             .map(|(i, _c)| i)
             .collect::<Vec<usize>>();
 
-        let index_all_columns = (0..splitted_columns.len()).collect::<Vec<usize>>();
+        let index_all_columns = (0..splitted_columns_from_file.len()).collect::<Vec<usize>>();
 
         // we need to change the value of the columns
         // we use a hash to store the new values
@@ -305,7 +297,7 @@ impl<'a> Table<'a> {
         // the change is done if the conditions are met
         let mut hash_changes: HashMap<usize, String> = HashMap::new();
 
-        for (i, _col) in splitted_columns.iter().enumerate() {
+        for (i, _col) in splitted_columns_from_file.iter().enumerate() {
             if index_selected_column.contains(&i) {
                 let position = match index_selected_column.iter().position(|&x| x == i) {
                     Some(p) => p,
@@ -331,13 +323,8 @@ impl<'a> Table<'a> {
 
         let mut temporal_file = BufWriter::new(File::create(formal_path)?);
 
-        temporal_file.write_all(
-            columns_from_csv
-                .split(",")
-                .collect::<Vec<&str>>()
-                .join(",")
-                .as_bytes(),
-        )?;
+        temporal_file.write_all(splitted_columns_from_file.join(",").as_bytes())?;
+
         temporal_file.write_all("\n".as_bytes())?;
 
         for line in BufReader::new(&self.file).lines().skip(1) {
@@ -346,14 +333,11 @@ impl<'a> Table<'a> {
 
             match opt_conditions {
                 Some(str_conditions) => {
-                    let splitted_columns_as_string = splitted_columns
-                        .iter()
-                        .map(|s| s.to_string())
-                        .collect::<Vec<String>>();
+                    let splitted_columns_as_string = splitted_columns_from_file.as_slice();
                     let (vec_conditions, _) = self.extract_conditions(
                         &index_all_columns,
                         &splitted_line,
-                        &splitted_columns_as_string,
+                        splitted_columns_as_string,
                     );
 
                     // lets see all keys and values
@@ -391,11 +375,11 @@ impl<'a> Table<'a> {
     }
 
     /// Helper to extract the conditions from the splitted line
-    /// 
+    ///
     /// Given a index of columns, the columns and the splitted line
-    /// 
+    ///
     /// we return a hash of conditions AND the line itself.
-    /// 
+    ///
     fn extract_conditions(
         &self,
         index_columns: &[usize],
@@ -427,7 +411,7 @@ impl<'a> Table<'a> {
     }
 
     /// Function that handles the insert query
-    /// 
+    ///
     /// Given a line, we writte it on the 'database' (our csv file)
     pub fn insert_line_to_csv(&mut self, line: String) -> Result<(), std::io::Error> {
         // lets open the file name in append mode
@@ -446,13 +430,13 @@ impl<'a> Table<'a> {
         // we need to write the lines that are not deleted in a temporal file
         // and then rename the temporal file to the original file
         // lets get the first line of the file to copy on the new file
-        let columns_from_csv = std::io::BufReader::new(&self.file)
-            .lines()
-            .next()
-            .unwrap_or(Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Error reading file",
-            )))?;
+        let splitted_columns_from_file = match self.get_column_from_file() {
+            Ok(columns) => columns,
+            Err(e) => {
+                return Err(e);
+            }
+        };
+        let columns_from_csv = splitted_columns_from_file.join(",");
 
         self.file.seek(SeekFrom::Start(0))?;
 
@@ -528,6 +512,20 @@ impl<'a> Table<'a> {
             Ok(_) => Ok(()),
             Err(_) => Err(FileErrors::InvalidFile),
         }
+    }
+
+    /// gets the columns of the table as string
+    fn get_column_from_file(&self) -> Result<Vec<String>, std::io::Error> {
+        let columns = std::io::BufReader::new(&self.file)
+            .lines()
+            .next()
+            .unwrap_or(Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Error reading file",
+            )))?;
+
+        let splitted_columns = columns.split(",").collect::<Vec<&str>>();
+        Ok(splitted_columns.iter().map(|s| s.to_string()).collect())
     }
 }
 

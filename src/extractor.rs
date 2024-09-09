@@ -54,11 +54,11 @@ impl Extractor {
     }
 
     /// Given a SQL Consult, we extract the columns and values for an INSERT INTO query
-    /// 
+    ///
     /// Example
-    /// 
+    ///
     /// INSERT INTO users (name, age) VALUES ('John', 20);
-    /// 
+    ///
     /// Returns (["name", "age"], ["John", "20"])
     pub fn extract_columns_and_values_for_insert(
         &self,
@@ -110,15 +110,15 @@ impl Extractor {
     }
 
     /// This one is tricky.
-    /// 
+    ///
     /// Given a SQL Consult, we extract the columns and values for an UPDATE query
-    /// 
+    ///
     /// but since update can miss the where condition, we need to handle that case.
-    /// 
+    ///
     /// Example: UPDATE users SET name = 'John', age = 20 WHERE id = 3;
-    /// 
+    ///
     /// This would return ```(["name", "age"], ["John", "20"])```
-    /// 
+    ///
     pub fn extract_columns_and_values_for_update(
         &self,
         query: &str,
@@ -133,8 +133,7 @@ impl Extractor {
             }
         };
 
-        let columns_str = &query[start_columns + "SET".len()..end_columns];
-        let columns_str = columns_str.trim();
+        let columns_str = &query[start_columns + "SET".len()..end_columns].trim();
 
         let tmp_what_to_update: Vec<String> = columns_str
             .split(',')
@@ -163,11 +162,11 @@ impl Extractor {
     }
 
     /// Given a SQL Consult, we extract the table name as string.
-    /// 
+    ///
     /// Example
-    /// 
+    ///
     /// SELECT * FROM users WHERE id = 3;
-    /// 
+    ///
     /// Returns "users"
     pub fn extract_table<'a>(
         &self,
@@ -193,46 +192,38 @@ impl Extractor {
     }
 
     /// Extracts the position from a QUERY to get the table name
-    /// 
+    ///
     /// Examples. ```SELECT * FROM users WHERE id = 3;``` -> gets FROM as start and WHERE as end, offset will be the length of FROM
-    /// 
+    ///
     /// ```INSERT INTO users (name, age) VALUES ('John', 20);``` -> gets INTO as start and ( as end, offset will be the length of INTO
-    /// 
+    ///
     /// ```UPDATE users SET name = 'John' WHERE id = 3;``` -> gets UPDATE as start and SET as end, offset will be the length of UPDATE
-    /// 
+    ///
     /// ```DELETE FROM users WHERE id = 3;``` -> gets DELETE as start and FROM as end, offset will be the length of DELETE
-    /// 
+    ///
     fn extract_positions(&self, query: &str, consult: SQLCommand) -> (usize, usize, usize) {
         let query = query.trim();
 
-        let start = match consult {
-            SQLCommand::Select | SQLCommand::Delete => query.find("FROM").unwrap_or(0),
-            SQLCommand::Insert => query.find("INTO").unwrap_or(0),
-            SQLCommand::Update => query.find("UPDATE").unwrap_or(0),
-        };
-
-        let offset = match consult {
-            SQLCommand::Select => "FROM".len(),
-            SQLCommand::Insert => "INTO".len(),
-            SQLCommand::Update => "UPDATE".len(),
-            SQLCommand::Delete => "FROM".len(),
+        let (start, offset) = match consult {
+            SQLCommand::Select | SQLCommand::Delete => {
+                let start = query.find("FROM").unwrap_or(0);
+                (start, "FROM".len())
+            }
+            SQLCommand::Insert => {
+                let start = query.find("INTO").unwrap_or(0);
+                (start, "INTO".len())
+            }
+            SQLCommand::Update => {
+                let start = query.find("UPDATE").unwrap_or(0);
+                (start, "UPDATE".len())
+            }
         };
 
         let end = match consult {
             SQLCommand::Select => {
-                match query.find("WHERE") {
-                    // we need to find WHERE, ORDER or ;
+                match query.find("WHERE").or(query.find("ORDER")) {
                     Some(pos) => pos,
-                    None => {
-                        // NO WHERE, so we need to find ORDER or ;
-                        match query.find("ORDER") {
-                            Some(pos) => pos,
-                            None => {
-                                // NO ORDER, so we need to find ;
-                                query.find(";").unwrap_or(0)
-                            }
-                        }
-                    }
+                    None => query.find(";").unwrap_or(0),
                 }
             }
             SQLCommand::Insert => {
@@ -256,9 +247,9 @@ impl Extractor {
     }
 
     /// Given a SQL Consult, we extract the conditions as string.
-    /// 
+    ///
     /// Example
-    /// 
+    ///
     /// ```SELECT * FROM users WHERE id = 3;```
     /// Returns ```id = 3```
     pub fn extract_as_str_conditions<'a>(&self, query: &'a str) -> Option<&'a str> {
@@ -266,15 +257,13 @@ impl Extractor {
 
         if let Some(pos) = query.find("WHERE") {
             // we need to concat the vector to that position
-            let end = query.find("ORDER").or(query.find(";"));
-            let end = match end {
+            let end = match query.find("ORDER").or(query.find(";")) {
                 Some(end) => end,
                 None => {
                     return None;
                 }
             };
-            let conditions = &query[pos + "WHERE".len()..end];
-            let conditions = conditions.trim();
+            let conditions = &query[pos + "WHERE".len()..end].trim();
             Some(conditions)
         } else {
             // no conditions, but maybe ordered by..
@@ -294,8 +283,7 @@ impl Extractor {
                 }
             };
 
-            let orderby = &query[pos + "ORDER BY".len()..semicolon_end];
-            let orderby = orderby.trim();
+            let orderby = &query[pos + "ORDER BY".len()..semicolon_end].trim();
             Some(orderby)
         } else {
             None
@@ -303,11 +291,11 @@ impl Extractor {
     }
 
     /// Given a parsed ORDER by clause (previously filtered with extract_orderby_as_str)
-    /// 
+    ///
     /// Returns a vector of tuples which contains the column to order and how
-    /// 
+    ///
     /// True means its gonna be ASC, False means its gonna be DESC
-    /// 
+    ///
     pub fn parser_orderby_from_str_to_vec(&self, str_orderby: &str) -> Vec<(String, bool)> {
         str_orderby
             .split(',')

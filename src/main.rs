@@ -19,6 +19,7 @@ fn main() {
 }
 
 /// check if the number of arguments is valid
+/// 
 /// returns false if the number is equal or lower than 2
 fn valid_number_of_args(args: &usize) -> bool {
     if *args <= 2 {
@@ -27,6 +28,27 @@ fn valid_number_of_args(args: &usize) -> bool {
     true
 }
 
+/// This function checks if the table selected in the query is the same as the table that is being used
+fn check_valid_table(extractor: &Extractor, table: &Table, consult: &str, method: SQLCommand) -> Result<(), errors::TPErrors<'static>> {
+    match extractor.extract_table(consult, method) {
+        Ok(table_name_from_query) => {
+            let table_name = match table.get_file_name() {
+                Ok(table_name) => table_name,
+                Err(e) => {
+                    return Err(e);
+                }
+            };
+
+            if table_name_from_query != table_name {
+                return Err(TPErrors::Table("Invalid table selected"));
+            }
+        }
+        Err(e) => {
+            return Err(e);
+        }
+    };
+    Ok(())
+}
 /// Executes the main logical problem of the program
 fn run(args: Vec<String>) -> Result<(), errors::TPErrors<'static>> {
     if !valid_number_of_args(&args.len()) {
@@ -65,19 +87,8 @@ fn run(args: Vec<String>) -> Result<(), errors::TPErrors<'static>> {
             }
 
             // checking if its a valid table
-            match extractor.extract_table(consult, SQLCommand::Select) {
-                Ok(table_name_from_query) => {
-                    let table_name = match table.get_file_name() {
-                        Ok(table_name) => table_name,
-                        Err(e) => {
-                            return Err(e);
-                        }
-                    };
-
-                    if table_name_from_query != table_name {
-                        return Err(TPErrors::Table("Invalid table selected"));
-                    }
-                }
+            match check_valid_table(&extractor, &table, consult, SQLCommand::Select) {
+                Ok(_) => {}
                 Err(e) => {
                     return Err(e);
                 }
@@ -121,23 +132,13 @@ fn run(args: Vec<String>) -> Result<(), errors::TPErrors<'static>> {
                 ));
             }
 
-            let table_from_query = match extractor.extract_table(consult, SQLCommand::Insert) {
-                Ok(table_as_string) => table_as_string,
+            match check_valid_table(&extractor, &table, consult, SQLCommand::Insert) {
+                Ok(_) => {}
                 Err(e) => {
                     return Err(e);
                 }
             };
 
-            match table.get_file_name() {
-                Ok(table_name) => {
-                    if table_from_query != table_name {
-                        return Err(TPErrors::Syntax("Invalid table selected"));
-                    }
-                }
-                Err(e) => {
-                    return Err(e);
-                }
-            };
 
             let (columns, values) = match extractor.extract_columns_and_values_for_insert(consult) {
                 Ok((columns, values)) => (columns, values),
@@ -162,24 +163,13 @@ fn run(args: Vec<String>) -> Result<(), errors::TPErrors<'static>> {
                 ));
             }
 
-            // checking if its a valid table
-            match extractor.extract_table(consult, SQLCommand::Update) {
-                Ok(table_name_from_query) => {
-                    let table_name = match table.get_file_name() {
-                        Ok(table_name) => table_name,
-                        Err(e) => {
-                            return Err(e);
-                        }
-                    };
-
-                    if table_name_from_query != table_name {
-                        return Err(TPErrors::Table("Invalid table selected"));
-                    }
-                }
+            match check_valid_table(&extractor, &table, consult, SQLCommand::Update) {
+                Ok(_) => {}
                 Err(e) => {
                     return Err(e);
                 }
             };
+
             let (columns, values) = match extractor.extract_columns_and_values_for_update(consult) {
                 Ok((columns, values)) => (columns, values),
                 Err(e) => {
@@ -205,23 +195,13 @@ fn run(args: Vec<String>) -> Result<(), errors::TPErrors<'static>> {
             }
 
             // checking if its a valid table
-            match extractor.extract_table(consult, SQLCommand::Delete) {
-                Ok(table_name_from_query) => {
-                    let table_name = match table.get_file_name() {
-                        Ok(table_name) => table_name,
-                        Err(e) => {
-                            return Err(e);
-                        }
-                    };
-
-                    if table_name_from_query != table_name {
-                        return Err(TPErrors::Table("Invalid table selected"));
-                    }
-                }
+            match check_valid_table(&extractor, &table, consult, SQLCommand::Delete) {
+                Ok(_) => {}
                 Err(e) => {
                     return Err(e);
                 }
             };
+
 
             let conditions = extractor.extract_as_str_conditions(consult);
 

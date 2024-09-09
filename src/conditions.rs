@@ -21,11 +21,11 @@ impl Conditions {
     }
 
     /// given a condition as STR it will return if the condition is met
-    /// 
+    ///
     /// Assuming conditions holds a condition as example: ```("Name", "John")```
-    /// 
+    ///
     /// a query with ```"Name = 'John'"``` will return true
-    /// 
+    ///
     pub fn matches_condition(&self, conditions: &str) -> bool {
         let splitted_conditions = conditions.split_whitespace().collect::<Vec<&str>>();
 
