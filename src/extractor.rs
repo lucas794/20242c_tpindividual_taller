@@ -53,6 +53,13 @@ impl Extractor {
         }
     }
 
+    /// Given a SQL Consult, we extract the columns and values for an INSERT INTO query
+    /// 
+    /// Example
+    /// 
+    /// INSERT INTO users (name, age) VALUES ('John', 20);
+    /// 
+    /// Returns (["name", "age"], ["John", "20"])
     pub fn extract_columns_and_values_for_insert(
         &self,
         query: &str,
@@ -102,6 +109,16 @@ impl Extractor {
         Ok((columns, values))
     }
 
+    /// This one is tricky.
+    /// 
+    /// Given a SQL Consult, we extract the columns and values for an UPDATE query
+    /// 
+    /// but since update can miss the where condition, we need to handle that case.
+    /// 
+    /// Example: UPDATE users SET name = 'John', age = 20 WHERE id = 3;
+    /// 
+    /// This would return ```(["name", "age"], ["John", "20"])```
+    /// 
     pub fn extract_columns_and_values_for_update(
         &self,
         query: &str,
@@ -146,8 +163,11 @@ impl Extractor {
     }
 
     /// Given a SQL Consult, we extract the table name as string.
+    /// 
     /// Example
+    /// 
     /// SELECT * FROM users WHERE id = 3;
+    /// 
     /// Returns "users"
     pub fn extract_table<'a>(
         &self,
@@ -173,10 +193,15 @@ impl Extractor {
     }
 
     /// Extracts the position from a QUERY to get the table name
-    /// Examples. SELECT * FROM users WHERE id = 3; -> gets FROM as start and WHERE as end, offset will be the length of FROM
-    /// INSERT INTO users (name, age) VALUES ('John', 20); -> gets INTO as start and ( as end, offset will be the length of INTO
-    /// UPDATE users SET name = 'John' WHERE id = 3; -> gets UPDATE as start and SET as end, offset will be the length of UPDATE
-    /// DELETE FROM users WHERE id = 3; -> gets DELETE as start and FROM as end, offset will be the length of DELETE
+    /// 
+    /// Examples. ```SELECT * FROM users WHERE id = 3;``` -> gets FROM as start and WHERE as end, offset will be the length of FROM
+    /// 
+    /// ```INSERT INTO users (name, age) VALUES ('John', 20);``` -> gets INTO as start and ( as end, offset will be the length of INTO
+    /// 
+    /// ```UPDATE users SET name = 'John' WHERE id = 3;``` -> gets UPDATE as start and SET as end, offset will be the length of UPDATE
+    /// 
+    /// ```DELETE FROM users WHERE id = 3;``` -> gets DELETE as start and FROM as end, offset will be the length of DELETE
+    /// 
     fn extract_positions(&self, query: &str, consult: SQLCommand) -> (usize, usize, usize) {
         let query = query.trim();
 
@@ -231,9 +256,11 @@ impl Extractor {
     }
 
     /// Given a SQL Consult, we extract the conditions as string.
+    /// 
     /// Example
-    /// SELECT * FROM users WHERE id = 3;
-    /// Returns "id = 3"
+    /// 
+    /// ```SELECT * FROM users WHERE id = 3;```
+    /// Returns ```id = 3```
     pub fn extract_as_str_conditions<'a>(&self, query: &'a str) -> Option<&'a str> {
         let query = query.trim();
 
@@ -276,8 +303,11 @@ impl Extractor {
     }
 
     /// Given a parsed ORDER by clause (previously filtered with extract_orderby_as_str)
+    /// 
     /// Returns a vector of tuples which contains the column to order and how
+    /// 
     /// True means its gonna be ASC, False means its gonna be DESC
+    /// 
     pub fn parser_orderby_from_str_to_vec(&self, str_orderby: &str) -> Vec<(String, bool)> {
         str_orderby
             .split(',')

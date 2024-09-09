@@ -21,6 +21,11 @@ impl Conditions {
     }
 
     /// given a condition as STR it will return if the condition is met
+    /// 
+    /// Assuming conditions holds a condition as example: ```("Name", "John")```
+    /// 
+    /// a query with ```"Name = 'John'"``` will return true
+    /// 
     pub fn matches_condition(&self, conditions: &str) -> bool {
         let splitted_conditions = conditions.split_whitespace().collect::<Vec<&str>>();
 
@@ -45,8 +50,8 @@ impl Conditions {
                     i += 1;
                     result =
                         result || self.evaluate_condition(&splitted_conditions, &mut i, is_negated);
-                    is_negated = false; // Reset negation flag after use
 
+                    is_negated = false; // Reset negation flag after use
                     if result {
                         // a single true in OR is enough
                         return true;
@@ -76,61 +81,66 @@ impl Conditions {
         // Find the actual value of the column from the record
         let found_column = self.data.iter().find(|(col, _)| col == column);
         if let Some((_, actual_value)) = found_column {
-            let condition_met = match (actual_value, *operator) {
-                (Value::String(actual), "=") => actual == value.trim_matches('\''),
-                (Value::String(actual), "!=") => actual != value.trim_matches('\''),
-                (Value::Integer(actual), "=") => {
-                    if let Ok(val) = value.parse::<i64>() {
-                        actual == &val
-                    } else {
-                        false
-                    }
-                }
-                (Value::Integer(actual), "!=") => {
-                    if let Ok(val) = value.parse::<i64>() {
-                        actual != &val
-                    } else {
-                        false
-                    }
-                }
-                (Value::Integer(actual), ">") => {
-                    if let Ok(val) = value.parse::<i64>() {
-                        actual > &val
-                    } else {
-                        false
-                    }
-                }
-                (Value::Integer(actual), "<") => {
-                    if let Ok(val) = value.parse::<i64>() {
-                        actual < &val
-                    } else {
-                        false
-                    }
-                }
-                (Value::Integer(actual), ">=") => {
-                    if let Ok(val) = value.parse::<i64>() {
-                        actual >= &val
-                    } else {
-                        false
-                    }
-                }
-                (Value::Integer(actual), "<=") => {
-                    if let Ok(val) = value.parse::<i64>() {
-                        actual <= &val
-                    } else {
-                        false
-                    }
-                }
-                _ => false,
-            };
+            let evaluation_check = self.resolve_evaluation(actual_value, operator, value);
 
             if negate {
-                !condition_met
+                !evaluation_check
             } else {
-                condition_met
+                evaluation_check
             }
         } else {
             false // Column not found in the record
+        }
+    }
+
+    /// Private function that help to check if conditions are met.
+    fn resolve_evaluation(&self, actual_value: &Value, operator: &str, value: &str) -> bool {
+        match (actual_value, operator) {
+            (Value::String(actual), "=") => actual == value.trim_matches('\''),
+            (Value::String(actual), "!=") => actual != value.trim_matches('\''),
+            (Value::Integer(actual), "=") => {
+                if let Ok(val) = value.parse::<i64>() {
+                    actual == &val
+                } else {
+                    false
+                }
+            }
+            (Value::Integer(actual), "!=") => {
+                if let Ok(val) = value.parse::<i64>() {
+                    actual != &val
+                } else {
+                    false
+                }
+            }
+            (Value::Integer(actual), ">") => {
+                if let Ok(val) = value.parse::<i64>() {
+                    actual > &val
+                } else {
+                    false
+                }
+            }
+            (Value::Integer(actual), "<") => {
+                if let Ok(val) = value.parse::<i64>() {
+                    actual < &val
+                } else {
+                    false
+                }
+            }
+            (Value::Integer(actual), ">=") => {
+                if let Ok(val) = value.parse::<i64>() {
+                    actual >= &val
+                } else {
+                    false
+                }
+            }
+            (Value::Integer(actual), "<=") => {
+                if let Ok(val) = value.parse::<i64>() {
+                    actual <= &val
+                } else {
+                    false
+                }
+            }
+            _ => false,
         }
     }
 }

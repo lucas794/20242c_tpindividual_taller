@@ -1,13 +1,13 @@
 use std::{
     cmp::Ordering,
     collections::HashMap,
-    fs::File,
+    fs::{self, File},
     io::{BufRead, BufReader, BufWriter, Seek, SeekFrom, Write},
 };
 
 use crate::{
     conditions::{Conditions, Value},
-    errors::TPErrors,
+    errors::*,
 };
 
 pub struct Table<'a> {
@@ -38,9 +38,12 @@ impl<'a> Table<'a> {
     }
 
     /// Get the file name of the table
+    /// 
     /// # Example
-    /// ./path/table.csv -> table
-    /// ./table.csv -> table
+    /// 
+    /// ```./path/table.csv``` -> table
+    /// 
+    /// ```./table.csv``` -> table
     pub fn get_file_name(&self) -> Result<&'a str, TPErrors<'static>> {
         let table_file = match self.file_name.split("/").last() {
             Some(name) => name,
@@ -63,8 +66,14 @@ impl<'a> Table<'a> {
         Ok(table_name)
     }
 
-    /// given the columns of the table, and the conditions of the query (as String)
+    /// given the columns of table, conditions as str and a sorting method
+    /// 
     /// it will return the result of the query
+    /// 
+    /// Example: Lets assume we have a DB with Nombre,Apellido
+    /// ```SELECT Nombre FROM table WHERE Apellido = 'Doe' ORDER BY Nombre ASC;```
+    /// 
+    /// The result will be a vector of vector of string (The content readed from the csv)
     pub fn resolve_select(
         &mut self,
         columns: Vec<String>,
@@ -194,8 +203,11 @@ impl<'a> Table<'a> {
     }
 
     /// given a columns and values as Vec of String
+    /// 
     /// It returns the proper line to write in the csv
+    /// 
     /// else returns a Error.
+    /// 
     pub fn resolve_insert(
         &self,
         columns: Vec<String>,
@@ -257,7 +269,9 @@ impl<'a> Table<'a> {
     }
 
     /// Function that handles the resolve of the update query
+    /// 
     /// Given the columns to update, the values to update, and the conditions as str
+    /// 
     /// it will return the result of the query
     pub fn resolve_update(
         &mut self,
@@ -336,14 +350,14 @@ impl<'a> Table<'a> {
                         .iter()
                         .map(|s| s.to_string())
                         .collect::<Vec<String>>();
-                    let (hashed_conditions, _) = self.extract_conditions(
+                    let (vec_conditions, _) = self.extract_conditions(
                         &index_all_columns,
                         &splitted_line,
                         &splitted_columns_as_string,
                     );
 
                     // lets see all keys and values
-                    let condition = Conditions::new(hashed_conditions);
+                    let condition = Conditions::new(vec_conditions);
 
                     // lets see all keys and values
                     if condition.matches_condition(str_conditions) {
@@ -376,8 +390,12 @@ impl<'a> Table<'a> {
         Ok(())
     }
 
+    /// Helper to extract the conditions from the splitted line
+    /// 
     /// Given a index of columns, the columns and the splitted line
+    /// 
     /// we return a hash of conditions AND the line itself.
+    /// 
     fn extract_conditions(
         &self,
         index_columns: &[usize],
@@ -408,6 +426,9 @@ impl<'a> Table<'a> {
         (vec_conditions, selected_columns)
     }
 
+    /// Function that handles the insert query
+    /// 
+    /// Given a line, we writte it on the 'database' (our csv file)
     pub fn insert_line_to_csv(&mut self, line: String) -> Result<(), std::io::Error> {
         // lets open the file name in append mode
         let mut file = std::fs::OpenOptions::new()
@@ -477,12 +498,35 @@ impl<'a> Table<'a> {
         Ok(())
     }
 
+    /// Returns the directory where the file is located
+    /// Example: ./path/to/file.csv -> ./path/to
+    /// Example: ./file.csv -> ./
     pub fn get_directory_where_file_is(&self) -> String {
         let file_path_pos = self.get_file_directory().rfind('/').unwrap_or(0);
 
         match file_path_pos {
             0 => "./".to_string(),
             _ => self.get_file_directory()[..file_path_pos].to_string(),
+        }
+    }
+
+    /// The approach in this work is to avoid reading the whole line on memory.
+    /// So, we create a "temp" csv file with the output
+    /// Then, at the end, switch names.
+    pub fn replace_original_with_tempfile(&self) -> Result<(), FileErrors> {
+        let original_file = self.get_file_directory();
+        let replacement = format!("{}/temporal_file.csv", self.get_directory_where_file_is());
+
+        match fs::remove_file(original_file) {
+            Ok(_) => {}
+            Err(_) => {
+                return Err(FileErrors::DeletionFailed);
+            }
+        }
+
+        match fs::rename(replacement, original_file) {
+            Ok(_) => Ok(()),
+            Err(_) => Err(FileErrors::InvalidFile),
         }
     }
 }

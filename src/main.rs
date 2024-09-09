@@ -52,11 +52,11 @@ fn run(args: Vec<String>) -> Result<(), errors::TPErrors<'static>> {
     let splitted_consult = consult.split(" ").collect::<Vec<&str>>();
     let command = splitted_consult[0];
 
-    let extractor = Extractor::new();
+    let extractor = Extractor;
 
     match command {
         "SELECT" => {
-            let select = Select::new();
+            let select = Select;
 
             if !select.is_valid_query(consult) {
                 return Err(TPErrors::Syntax(
@@ -113,7 +113,7 @@ fn run(args: Vec<String>) -> Result<(), errors::TPErrors<'static>> {
             return Ok(());
         }
         "INSERT" => {
-            let insert = Insert::new();
+            let insert = Insert;
 
             if !insert.is_valid_query(consult) {
                 return Err(TPErrors::Syntax(
@@ -154,7 +154,7 @@ fn run(args: Vec<String>) -> Result<(), errors::TPErrors<'static>> {
             return Ok(());
         }
         "UPDATE" => {
-            let update = Update::new();
+            let update = Update;
 
             if !update.is_valid_query(consult) {
                 return Err(TPErrors::Syntax(
@@ -196,7 +196,7 @@ fn run(args: Vec<String>) -> Result<(), errors::TPErrors<'static>> {
             }
         }
         "DELETE" => {
-            let delete = Delete::new();
+            let delete = Delete;
 
             if !delete.is_valid_query(consult) {
                 return Err(TPErrors::Syntax(

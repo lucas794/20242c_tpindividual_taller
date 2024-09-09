@@ -1,6 +1,7 @@
-use std::fs;
-
-use crate::{errors::TPErrors, table::Table};
+use crate::{
+    errors::{FileErrors, TPErrors},
+    table::Table,
+};
 
 /// Select representation for the SQL query
 pub struct Select;
@@ -38,6 +39,7 @@ impl Select {
     }
 
     /// A valid select query contains SELECT and FROM AND ends with ;
+    /// 
     /// if the query is valid, it will return true
     pub fn is_valid_query(&self, query: &str) -> bool {
         let query = query.trim();
@@ -52,8 +54,11 @@ impl Select {
     }
 
     /// Given a table, columns, conditions and sorting method
+    /// 
     /// executes a SELECT query statement.
+    /// 
     /// Returns ok if the query was executed successfully
+    /// 
     pub fn execute_select(
         &self,
         table: &mut Table,
@@ -65,15 +70,9 @@ impl Select {
 
         match csv_data {
             Ok(data) => {
-                // lets write stdout
-                /*let stdout = io::stdout();
-
-                let mut handle = io::BufWriter::new(stdout.lock());*/
-
                 for line in data {
                     let temp_line = line.join(",");
                     println!("{}", temp_line);
-                    //let _ = handle.write(temp_line.as_bytes());
                 }
                 Ok(())
             }
@@ -90,6 +89,7 @@ impl Insert {
     }
 
     /// A valid INSERT query contains INSERT INTO and VALUES AND ends with ;
+    /// 
     /// if the query is valid, it will return true
     pub fn is_valid_query(&self, query: &str) -> bool {
         let query = query.trim();
@@ -138,9 +138,13 @@ impl Update {
     }
 
     /// A valid UPDATE query contains UPDATE and SET AND ends with ;
+    /// 
     /// if the query is valid, it will return true
+    /// 
     /// UPDATE table_name SET column1 = value1, column2 = value2 WHERE condition;
+    /// 
     /// UPDATE table_name SET column1 = value1, column2 = value2;
+    /// 
     pub fn is_valid_query(&self, query: &str) -> bool {
         let query = query.trim();
 
@@ -164,27 +168,18 @@ impl Update {
 
         match resolve {
             Ok(_) => {
-                // we need to make a shift of files
-                // temporal file should be renamed to the original file name
-                // and the original file should be deleted
-
-                let original_file = table.get_file_directory();
-                let replacement =
-                    format!("{}/temporal_file.csv", table.get_directory_where_file_is());
-
-                match fs::remove_file(original_file) {
+                match table.replace_original_with_tempfile() {
                     Ok(_) => {}
-                    Err(_) => {
-                        return Err(TPErrors::Generic("Error while deleting the original file"));
-                    }
+                    Err(e) => match e {
+                        FileErrors::DeletionFailed => {
+                            return Err(TPErrors::Generic("Deletion failed"));
+                        }
+                        FileErrors::InvalidFile => {
+                            return Err(TPErrors::Generic("Error while updating the file"));
+                        }
+                    },
                 }
 
-                match fs::rename(replacement, original_file) {
-                    Ok(_) => {}
-                    Err(_) => {
-                        return Err(TPErrors::Generic("Error while renaming the temporal file"));
-                    }
-                }
                 Ok(())
             }
             Err(_) => {
@@ -220,26 +215,18 @@ impl Delete {
 
         match resolve {
             Ok(_) => {
-                // we need to make a shift of files
-                // temporal file should be renamed to the original file name
-                // and the original file should be deleted
-                let original_file = table.get_file_directory();
-                let replacement =
-                    format!("{}/temporal_file.csv", table.get_directory_where_file_is());
-
-                match fs::remove_file(original_file) {
+                match table.replace_original_with_tempfile() {
                     Ok(_) => {}
-                    Err(_) => {
-                        return Err(TPErrors::Generic("Error while deleting the original file"));
-                    }
+                    Err(e) => match e {
+                        FileErrors::DeletionFailed => {
+                            return Err(TPErrors::Generic("Deletion failed"));
+                        }
+                        FileErrors::InvalidFile => {
+                            return Err(TPErrors::Generic("Error while updating the file"));
+                        }
+                    },
                 }
 
-                match fs::rename(replacement, original_file) {
-                    Ok(_) => {}
-                    Err(_) => {
-                        return Err(TPErrors::Generic("Error while renaming the temporal file"));
-                    }
-                }
                 Ok(())
             }
             Err(_) => {
@@ -248,7 +235,6 @@ impl Delete {
         }
     }
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
