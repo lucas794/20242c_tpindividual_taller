@@ -604,8 +604,6 @@
 <a href="#604" id="604">604</a>
 <a href="#605" id="605">605</a>
 <a href="#606" id="606">606</a>
-<a href="#607" id="607">607</a>
-<a href="#608" id="608">608</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{
     cmp::Ordering,
     collections::HashMap,
@@ -623,7 +621,9 @@
     file: File,
 }
 
-<span class="kw">impl</span>&lt;<span class="lifetime">'a</span>&gt; Table&lt;<span class="lifetime">'a</span>&gt; {
+<span class="comment">// lets implement a comparator to sort a vector 
+
+</span><span class="kw">impl</span>&lt;<span class="lifetime">'a</span>&gt; Table&lt;<span class="lifetime">'a</span>&gt; {
     <span class="kw">pub fn </span>new(file_name: <span class="kw-2">&amp;</span><span class="lifetime">'a </span>str) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, std::io::Error&gt; {
         <span class="kw">let </span>file_reference = File::open(file_name);
 
@@ -646,11 +646,11 @@
     }
 
     <span class="doccomment">/// Get the file name of the table
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```./path/table.csv``` -&gt; table
-    /// 
+    ///
     /// ```./table.csv``` -&gt; table
     </span><span class="kw">pub fn </span>get_file_name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">'a </span>str, TPErrors&lt;<span class="lifetime">'static</span>&gt;&gt; {
         <span class="kw">let </span>table_file = <span class="kw">match </span><span class="self">self</span>.file_name.split(<span class="string">"/"</span>).last() {
@@ -675,12 +675,12 @@
     }
 
     <span class="doccomment">/// given the columns of table, conditions as str and a sorting method
-    /// 
+    ///
     /// it will return the result of the query
-    /// 
+    ///
     /// Example: Lets assume we have a DB with Nombre,Apellido
     /// ```SELECT Nombre FROM table WHERE Apellido = 'Doe' ORDER BY Nombre ASC;```
-    /// 
+    ///
     /// The result will be a vector of vector of string (The content readed from the csv)
     </span><span class="kw">pub fn </span>resolve_select(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
@@ -692,22 +692,18 @@
         // we need to read the csv and get the columns
         // we need to print the columns
 
-        // lets read the first line of the file
-        </span><span class="kw">let </span>index_columns = std::io::BufReader::new(<span class="kw-2">&amp;</span><span class="self">self</span>.file)
-            .lines()
-            .next()
-            .unwrap_or(<span class="prelude-val">Err</span>(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                <span class="string">"Error reading file"</span>,
-            )))<span class="question-mark">?</span>;
-
-        <span class="kw">let </span>splitted_columns = index_columns.split(<span class="string">","</span>).collect::&lt;Vec&lt;<span class="kw-2">&amp;</span>str&gt;&gt;();
+        </span><span class="kw">let </span>splitted_columns_from_file = <span class="kw">match </span><span class="self">self</span>.get_column_from_file() {
+            <span class="prelude-val">Ok</span>(columns) =&gt; columns,
+            <span class="prelude-val">Err</span>(e) =&gt; {
+                <span class="kw">return </span><span class="prelude-val">Err</span>(e);
+            }
+        };
 
         <span class="comment">// lets check if its a select *
         </span><span class="kw">let </span>index_columns = <span class="kw">if </span>columns.len() == <span class="number">1 </span>&amp;&amp; columns[<span class="number">0</span>] == <span class="string">"*" </span>{
-            (<span class="number">0</span>..splitted_columns.len()).collect::&lt;Vec&lt;usize&gt;&gt;()
+            (<span class="number">0</span>..splitted_columns_from_file.len()).collect::&lt;Vec&lt;usize&gt;&gt;()
         } <span class="kw">else </span>{
-            <span class="kw">let </span>temp_index = splitted_columns
+            <span class="kw">let </span>temp_index = splitted_columns_from_file
                 .iter()
                 .enumerate()
                 .filter(|(_i, c)| columns.contains(<span class="kw-2">&amp;</span>c.to_string()))
@@ -725,7 +721,7 @@
 
         <span class="kw">let </span>columns = <span class="kw">if </span>columns.len() == <span class="number">1 </span>&amp;&amp; columns[<span class="number">0</span>] == <span class="string">"*" </span>{
             <span class="comment">// we need to handle the case if its a joker *
-            </span>splitted_columns
+            </span>splitted_columns_from_file
                 .iter()
                 .map(|s| s.to_string())
                 .collect::&lt;Vec&lt;String&gt;&gt;()
@@ -811,37 +807,34 @@
     }
 
     <span class="doccomment">/// given a columns and values as Vec of String
-    /// 
+    ///
     /// It returns the proper line to write in the csv
-    /// 
+    ///
     /// else returns a Error.
-    /// 
+    ///
     </span><span class="kw">pub fn </span>resolve_insert(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         columns: Vec&lt;String&gt;,
         values: Vec&lt;String&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;String&gt;, std::io::Error&gt; {
         <span class="comment">// we need to check if the columns are valid
-        </span><span class="kw">let </span>index_columns = std::io::BufReader::new(<span class="kw-2">&amp;</span><span class="self">self</span>.file)
-            .lines()
-            .next()
-            .unwrap_or(<span class="prelude-val">Err</span>(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                <span class="string">"Error reading file"</span>,
-            )))<span class="question-mark">?</span>;
-
-        <span class="kw">let </span>splitted_columns = index_columns.split(<span class="string">","</span>).collect::&lt;Vec&lt;<span class="kw-2">&amp;</span>str&gt;&gt;();
+        </span><span class="kw">let </span>splitted_columns_from_file = <span class="kw">match </span><span class="self">self</span>.get_column_from_file() {
+            <span class="prelude-val">Ok</span>(columns) =&gt; columns,
+            <span class="prelude-val">Err</span>(e) =&gt; {
+                <span class="kw">return </span><span class="prelude-val">Err</span>(e);
+            }
+        };
 
         <span class="comment">// if the column IS the same as values, this means that the columns weren't send on the query.
         </span><span class="kw">let </span>temp_index = <span class="kw">if </span>columns != values {
-            splitted_columns
+            splitted_columns_from_file
                 .iter()
                 .enumerate()
                 .filter(|(_i, c)| columns.contains(<span class="kw-2">&amp;</span>c.to_string()))
                 .map(|(i, _c)| i)
                 .collect::&lt;Vec&lt;usize&gt;&gt;()
         } <span class="kw">else </span>{
-            (<span class="number">0</span>..splitted_columns.len()).collect::&lt;Vec&lt;usize&gt;&gt;()
+            (<span class="number">0</span>..splitted_columns_from_file.len()).collect::&lt;Vec&lt;usize&gt;&gt;()
         };
 
         <span class="comment">// columns != temp_index OR the table doesn't exist in the csv file.
@@ -856,7 +849,7 @@
         <span class="comment">// now we need to each temp_index, writ the value
         // else we write a empty string
         </span><span class="kw">let </span><span class="kw-2">mut </span>line_to_write: Vec&lt;String&gt; = Vec::new();
-        <span class="kw">for </span>(i, _col) <span class="kw">in </span>splitted_columns.iter().enumerate() {
+        <span class="kw">for </span>(i, _col) <span class="kw">in </span>splitted_columns_from_file.iter().enumerate() {
             <span class="kw">if </span>temp_index.contains(<span class="kw-2">&amp;</span>i) {
                 <span class="kw">let </span>position = <span class="kw">match </span>temp_index.iter().position(|<span class="kw-2">&amp;</span>x| x == i) {
                     <span class="prelude-val">Some</span>(p) =&gt; p,
@@ -877,9 +870,9 @@
     }
 
     <span class="doccomment">/// Function that handles the resolve of the update query
-    /// 
+    ///
     /// Given the columns to update, the values to update, and the conditions as str
-    /// 
+    ///
     /// it will return the result of the query
     </span><span class="kw">pub fn </span>resolve_update(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
@@ -888,24 +881,21 @@
         opt_conditions: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>str&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), std::io::Error&gt; {
         <span class="comment">// we need to check if the columns are valid
-        </span><span class="kw">let </span>columns_from_csv = std::io::BufReader::new(<span class="kw-2">&amp;</span><span class="self">self</span>.file)
-            .lines()
-            .next()
-            .unwrap_or(<span class="prelude-val">Err</span>(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                <span class="string">"Error reading file"</span>,
-            )))<span class="question-mark">?</span>;
+        </span><span class="kw">let </span>splitted_columns_from_file = <span class="kw">match </span><span class="self">self</span>.get_column_from_file() {
+            <span class="prelude-val">Ok</span>(columns) =&gt; columns,
+            <span class="prelude-val">Err</span>(e) =&gt; {
+                <span class="kw">return </span><span class="prelude-val">Err</span>(e);
+            }
+        };
 
-        <span class="kw">let </span>splitted_columns = columns_from_csv.split(<span class="string">","</span>).collect::&lt;Vec&lt;<span class="kw-2">&amp;</span>str&gt;&gt;();
-
-        <span class="kw">let </span>index_selected_column = splitted_columns
+        <span class="kw">let </span>index_selected_column: Vec&lt;usize&gt; = splitted_columns_from_file
             .iter()
             .enumerate()
             .filter(|(_i, c)| columns.contains(<span class="kw-2">&amp;</span>c.to_string()))
             .map(|(i, _c)| i)
             .collect::&lt;Vec&lt;usize&gt;&gt;();
 
-        <span class="kw">let </span>index_all_columns = (<span class="number">0</span>..splitted_columns.len()).collect::&lt;Vec&lt;usize&gt;&gt;();
+        <span class="kw">let </span>index_all_columns = (<span class="number">0</span>..splitted_columns_from_file.len()).collect::&lt;Vec&lt;usize&gt;&gt;();
 
         <span class="comment">// we need to change the value of the columns
         // we use a hash to store the new values
@@ -913,7 +903,7 @@
         // the change is done if the conditions are met
         </span><span class="kw">let </span><span class="kw-2">mut </span>hash_changes: HashMap&lt;usize, String&gt; = HashMap::new();
 
-        <span class="kw">for </span>(i, _col) <span class="kw">in </span>splitted_columns.iter().enumerate() {
+        <span class="kw">for </span>(i, _col) <span class="kw">in </span>splitted_columns_from_file.iter().enumerate() {
             <span class="kw">if </span>index_selected_column.contains(<span class="kw-2">&amp;</span>i) {
                 <span class="kw">let </span>position = <span class="kw">match </span>index_selected_column.iter().position(|<span class="kw-2">&amp;</span>x| x == i) {
                     <span class="prelude-val">Some</span>(p) =&gt; p,
@@ -939,13 +929,8 @@
 
         <span class="kw">let </span><span class="kw-2">mut </span>temporal_file = BufWriter::new(File::create(formal_path)<span class="question-mark">?</span>);
 
-        temporal_file.write_all(
-            columns_from_csv
-                .split(<span class="string">","</span>)
-                .collect::&lt;Vec&lt;<span class="kw-2">&amp;</span>str&gt;&gt;()
-                .join(<span class="string">","</span>)
-                .as_bytes(),
-        )<span class="question-mark">?</span>;
+        temporal_file.write_all(splitted_columns_from_file.join(<span class="string">","</span>).as_bytes())<span class="question-mark">?</span>;
+
         temporal_file.write_all(<span class="string">"\n"</span>.as_bytes())<span class="question-mark">?</span>;
 
         <span class="kw">for </span>line <span class="kw">in </span>BufReader::new(<span class="kw-2">&amp;</span><span class="self">self</span>.file).lines().skip(<span class="number">1</span>) {
@@ -954,14 +939,11 @@
 
             <span class="kw">match </span>opt_conditions {
                 <span class="prelude-val">Some</span>(str_conditions) =&gt; {
-                    <span class="kw">let </span>splitted_columns_as_string = splitted_columns
-                        .iter()
-                        .map(|s| s.to_string())
-                        .collect::&lt;Vec&lt;String&gt;&gt;();
+                    <span class="kw">let </span>splitted_columns_as_string = splitted_columns_from_file.as_slice();
                     <span class="kw">let </span>(vec_conditions, <span class="kw">_</span>) = <span class="self">self</span>.extract_conditions(
                         <span class="kw-2">&amp;</span>index_all_columns,
                         <span class="kw-2">&amp;</span>splitted_line,
-                        <span class="kw-2">&amp;</span>splitted_columns_as_string,
+                        splitted_columns_as_string,
                     );
 
                     <span class="comment">// lets see all keys and values
@@ -999,11 +981,11 @@
     }
 
     <span class="doccomment">/// Helper to extract the conditions from the splitted line
-    /// 
+    ///
     /// Given a index of columns, the columns and the splitted line
-    /// 
+    ///
     /// we return a hash of conditions AND the line itself.
-    /// 
+    ///
     </span><span class="kw">fn </span>extract_conditions(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         index_columns: <span class="kw-2">&amp;</span>[usize],
@@ -1035,7 +1017,7 @@
     }
 
     <span class="doccomment">/// Function that handles the insert query
-    /// 
+    ///
     /// Given a line, we writte it on the 'database' (our csv file)
     </span><span class="kw">pub fn </span>insert_line_to_csv(<span class="kw-2">&amp;mut </span><span class="self">self</span>, line: String) -&gt; <span class="prelude-ty">Result</span>&lt;(), std::io::Error&gt; {
         <span class="comment">// lets open the file name in append mode
@@ -1054,13 +1036,13 @@
         // we need to write the lines that are not deleted in a temporal file
         // and then rename the temporal file to the original file
         // lets get the first line of the file to copy on the new file
-        </span><span class="kw">let </span>columns_from_csv = std::io::BufReader::new(<span class="kw-2">&amp;</span><span class="self">self</span>.file)
-            .lines()
-            .next()
-            .unwrap_or(<span class="prelude-val">Err</span>(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                <span class="string">"Error reading file"</span>,
-            )))<span class="question-mark">?</span>;
+        </span><span class="kw">let </span>splitted_columns_from_file = <span class="kw">match </span><span class="self">self</span>.get_column_from_file() {
+            <span class="prelude-val">Ok</span>(columns) =&gt; columns,
+            <span class="prelude-val">Err</span>(e) =&gt; {
+                <span class="kw">return </span><span class="prelude-val">Err</span>(e);
+            }
+        };
+        <span class="kw">let </span>columns_from_csv = splitted_columns_from_file.join(<span class="string">","</span>);
 
         <span class="self">self</span>.file.seek(SeekFrom::Start(<span class="number">0</span>))<span class="question-mark">?</span>;
 
@@ -1136,6 +1118,20 @@
             <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Ok</span>(()),
             <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Err</span>(FileErrors::InvalidFile),
         }
+    }
+
+    <span class="doccomment">/// gets the columns of the table as string
+    </span><span class="kw">fn </span>get_column_from_file(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;String&gt;, std::io::Error&gt; {
+        <span class="kw">let </span>columns = std::io::BufReader::new(<span class="kw-2">&amp;</span><span class="self">self</span>.file)
+            .lines()
+            .next()
+            .unwrap_or(<span class="prelude-val">Err</span>(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                <span class="string">"Error reading file"</span>,
+            )))<span class="question-mark">?</span>;
+
+        <span class="kw">let </span>splitted_columns = columns.split(<span class="string">","</span>).collect::&lt;Vec&lt;<span class="kw-2">&amp;</span>str&gt;&gt;();
+        <span class="prelude-val">Ok</span>(splitted_columns.iter().map(|s| s.to_string()).collect())
     }
 }
 

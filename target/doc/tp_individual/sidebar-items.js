@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["main","run","valid_number_of_args"],"mod":["conditions","consults","errors","extractor","table"]};
+window.SIDEBAR_ITEMS = {"fn":["check_valid_table","main","run","valid_number_of_args"],"mod":["conditions","consults","errors","extractor","table"]};

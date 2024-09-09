@@ -217,26 +217,6 @@
 <a href="#217" id="217">217</a>
 <a href="#218" id="218">218</a>
 <a href="#219" id="219">219</a>
-<a href="#220" id="220">220</a>
-<a href="#221" id="221">221</a>
-<a href="#222" id="222">222</a>
-<a href="#223" id="223">223</a>
-<a href="#224" id="224">224</a>
-<a href="#225" id="225">225</a>
-<a href="#226" id="226">226</a>
-<a href="#227" id="227">227</a>
-<a href="#228" id="228">228</a>
-<a href="#229" id="229">229</a>
-<a href="#230" id="230">230</a>
-<a href="#231" id="231">231</a>
-<a href="#232" id="232">232</a>
-<a href="#233" id="233">233</a>
-<a href="#234" id="234">234</a>
-<a href="#235" id="235">235</a>
-<a href="#236" id="236">236</a>
-<a href="#237" id="237">237</a>
-<a href="#238" id="238">238</a>
-<a href="#239" id="239">239</a>
 </pre></div><pre class="rust"><code><span class="kw">mod </span>conditions;
 <span class="kw">mod </span>consults;
 <span class="kw">mod </span>errors;
@@ -258,6 +238,7 @@
 }
 
 <span class="doccomment">/// check if the number of arguments is valid
+/// 
 /// returns false if the number is equal or lower than 2
 </span><span class="kw">fn </span>valid_number_of_args(args: <span class="kw-2">&amp;</span>usize) -&gt; bool {
     <span class="kw">if </span><span class="kw-2">*</span>args &lt;= <span class="number">2 </span>{
@@ -266,6 +247,27 @@
     <span class="bool-val">true
 </span>}
 
+<span class="doccomment">/// This function checks if the table selected in the query is the same as the table that is being used
+</span><span class="kw">fn </span>check_valid_table(extractor: <span class="kw-2">&amp;</span>Extractor, table: <span class="kw-2">&amp;</span>Table, consult: <span class="kw-2">&amp;</span>str, method: SQLCommand) -&gt; <span class="prelude-ty">Result</span>&lt;(), errors::TPErrors&lt;<span class="lifetime">'static</span>&gt;&gt; {
+    <span class="kw">match </span>extractor.extract_table(consult, method) {
+        <span class="prelude-val">Ok</span>(table_name_from_query) =&gt; {
+            <span class="kw">let </span>table_name = <span class="kw">match </span>table.get_file_name() {
+                <span class="prelude-val">Ok</span>(table_name) =&gt; table_name,
+                <span class="prelude-val">Err</span>(e) =&gt; {
+                    <span class="kw">return </span><span class="prelude-val">Err</span>(e);
+                }
+            };
+
+            <span class="kw">if </span>table_name_from_query != table_name {
+                <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::Table(<span class="string">"Invalid table selected"</span>));
+            }
+        }
+        <span class="prelude-val">Err</span>(e) =&gt; {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(e);
+        }
+    };
+    <span class="prelude-val">Ok</span>(())
+}
 <span class="doccomment">/// Executes the main logical problem of the program
 </span><span class="kw">fn </span>run(args: Vec&lt;String&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), errors::TPErrors&lt;<span class="lifetime">'static</span>&gt;&gt; {
     <span class="kw">if </span>!valid_number_of_args(<span class="kw-2">&amp;</span>args.len()) {
@@ -304,19 +306,8 @@
             }
 
             <span class="comment">// checking if its a valid table
-            </span><span class="kw">match </span>extractor.extract_table(consult, SQLCommand::Select) {
-                <span class="prelude-val">Ok</span>(table_name_from_query) =&gt; {
-                    <span class="kw">let </span>table_name = <span class="kw">match </span>table.get_file_name() {
-                        <span class="prelude-val">Ok</span>(table_name) =&gt; table_name,
-                        <span class="prelude-val">Err</span>(e) =&gt; {
-                            <span class="kw">return </span><span class="prelude-val">Err</span>(e);
-                        }
-                    };
-
-                    <span class="kw">if </span>table_name_from_query != table_name {
-                        <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::Table(<span class="string">"Invalid table selected"</span>));
-                    }
-                }
+            </span><span class="kw">match </span>check_valid_table(<span class="kw-2">&amp;</span>extractor, <span class="kw-2">&amp;</span>table, consult, SQLCommand::Select) {
+                <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; {}
                 <span class="prelude-val">Err</span>(e) =&gt; {
                     <span class="kw">return </span><span class="prelude-val">Err</span>(e);
                 }
@@ -360,23 +351,13 @@
                 ));
             }
 
-            <span class="kw">let </span>table_from_query = <span class="kw">match </span>extractor.extract_table(consult, SQLCommand::Insert) {
-                <span class="prelude-val">Ok</span>(table_as_string) =&gt; table_as_string,
+            <span class="kw">match </span>check_valid_table(<span class="kw-2">&amp;</span>extractor, <span class="kw-2">&amp;</span>table, consult, SQLCommand::Insert) {
+                <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; {}
                 <span class="prelude-val">Err</span>(e) =&gt; {
                     <span class="kw">return </span><span class="prelude-val">Err</span>(e);
                 }
             };
 
-            <span class="kw">match </span>table.get_file_name() {
-                <span class="prelude-val">Ok</span>(table_name) =&gt; {
-                    <span class="kw">if </span>table_from_query != table_name {
-                        <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::Syntax(<span class="string">"Invalid table selected"</span>));
-                    }
-                }
-                <span class="prelude-val">Err</span>(e) =&gt; {
-                    <span class="kw">return </span><span class="prelude-val">Err</span>(e);
-                }
-            };
 
             <span class="kw">let </span>(columns, values) = <span class="kw">match </span>extractor.extract_columns_and_values_for_insert(consult) {
                 <span class="prelude-val">Ok</span>((columns, values)) =&gt; (columns, values),
@@ -401,24 +382,13 @@
                 ));
             }
 
-            <span class="comment">// checking if its a valid table
-            </span><span class="kw">match </span>extractor.extract_table(consult, SQLCommand::Update) {
-                <span class="prelude-val">Ok</span>(table_name_from_query) =&gt; {
-                    <span class="kw">let </span>table_name = <span class="kw">match </span>table.get_file_name() {
-                        <span class="prelude-val">Ok</span>(table_name) =&gt; table_name,
-                        <span class="prelude-val">Err</span>(e) =&gt; {
-                            <span class="kw">return </span><span class="prelude-val">Err</span>(e);
-                        }
-                    };
-
-                    <span class="kw">if </span>table_name_from_query != table_name {
-                        <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::Table(<span class="string">"Invalid table selected"</span>));
-                    }
-                }
+            <span class="kw">match </span>check_valid_table(<span class="kw-2">&amp;</span>extractor, <span class="kw-2">&amp;</span>table, consult, SQLCommand::Update) {
+                <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; {}
                 <span class="prelude-val">Err</span>(e) =&gt; {
                     <span class="kw">return </span><span class="prelude-val">Err</span>(e);
                 }
             };
+
             <span class="kw">let </span>(columns, values) = <span class="kw">match </span>extractor.extract_columns_and_values_for_update(consult) {
                 <span class="prelude-val">Ok</span>((columns, values)) =&gt; (columns, values),
                 <span class="prelude-val">Err</span>(e) =&gt; {
@@ -444,23 +414,13 @@
             }
 
             <span class="comment">// checking if its a valid table
-            </span><span class="kw">match </span>extractor.extract_table(consult, SQLCommand::Delete) {
-                <span class="prelude-val">Ok</span>(table_name_from_query) =&gt; {
-                    <span class="kw">let </span>table_name = <span class="kw">match </span>table.get_file_name() {
-                        <span class="prelude-val">Ok</span>(table_name) =&gt; table_name,
-                        <span class="prelude-val">Err</span>(e) =&gt; {
-                            <span class="kw">return </span><span class="prelude-val">Err</span>(e);
-                        }
-                    };
-
-                    <span class="kw">if </span>table_name_from_query != table_name {
-                        <span class="kw">return </span><span class="prelude-val">Err</span>(TPErrors::Table(<span class="string">"Invalid table selected"</span>));
-                    }
-                }
+            </span><span class="kw">match </span>check_valid_table(<span class="kw-2">&amp;</span>extractor, <span class="kw-2">&amp;</span>table, consult, SQLCommand::Delete) {
+                <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; {}
                 <span class="prelude-val">Err</span>(e) =&gt; {
                     <span class="kw">return </span><span class="prelude-val">Err</span>(e);
                 }
             };
+
 
             <span class="kw">let </span>conditions = extractor.extract_as_str_conditions(consult);
 

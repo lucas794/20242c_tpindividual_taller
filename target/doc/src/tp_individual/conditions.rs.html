@@ -241,11 +241,11 @@
     }
 
     <span class="doccomment">/// given a condition as STR it will return if the condition is met
-    /// 
+    ///
     /// Assuming conditions holds a condition as example: ```("Name", "John")```
-    /// 
-    /// a query with "Name = 'John'" will return true
-    /// 
+    ///
+    /// a query with ```"Name = 'John'"``` will return true
+    ///
     </span><span class="kw">pub fn </span>matches_condition(<span class="kw-2">&amp;</span><span class="self">self</span>, conditions: <span class="kw-2">&amp;</span>str) -&gt; bool {
         <span class="kw">let </span>splitted_conditions = conditions.split_whitespace().collect::&lt;Vec&lt;<span class="kw-2">&amp;</span>str&gt;&gt;();
 

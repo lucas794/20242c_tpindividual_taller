@@ -525,18 +525,6 @@
 <a href="#525" id="525">525</a>
 <a href="#526" id="526">526</a>
 <a href="#527" id="527">527</a>
-<a href="#528" id="528">528</a>
-<a href="#529" id="529">529</a>
-<a href="#530" id="530">530</a>
-<a href="#531" id="531">531</a>
-<a href="#532" id="532">532</a>
-<a href="#533" id="533">533</a>
-<a href="#534" id="534">534</a>
-<a href="#535" id="535">535</a>
-<a href="#536" id="536">536</a>
-<a href="#537" id="537">537</a>
-<a href="#538" id="538">538</a>
-<a href="#539" id="539">539</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::errors::TPErrors;
 
 <span class="kw">pub struct </span>Extractor;
@@ -593,11 +581,11 @@
     }
 
     <span class="doccomment">/// Given a SQL Consult, we extract the columns and values for an INSERT INTO query
-    /// 
+    ///
     /// Example
-    /// 
+    ///
     /// INSERT INTO users (name, age) VALUES ('John', 20);
-    /// 
+    ///
     /// Returns (["name", "age"], ["John", "20"])
     </span><span class="kw">pub fn </span>extract_columns_and_values_for_insert(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
@@ -649,15 +637,15 @@
     }
 
     <span class="doccomment">/// This one is tricky.
-    /// 
+    ///
     /// Given a SQL Consult, we extract the columns and values for an UPDATE query
-    /// 
+    ///
     /// but since update can miss the where condition, we need to handle that case.
-    /// 
+    ///
     /// Example: UPDATE users SET name = 'John', age = 20 WHERE id = 3;
-    /// 
+    ///
     /// This would return ```(["name", "age"], ["John", "20"])```
-    /// 
+    ///
     </span><span class="kw">pub fn </span>extract_columns_and_values_for_update(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         query: <span class="kw-2">&amp;</span>str,
@@ -672,8 +660,7 @@
             }
         };
 
-        <span class="kw">let </span>columns_str = <span class="kw-2">&amp;</span>query[start_columns + <span class="string">"SET"</span>.len()..end_columns];
-        <span class="kw">let </span>columns_str = columns_str.trim();
+        <span class="kw">let </span>columns_str = <span class="kw-2">&amp;</span>query[start_columns + <span class="string">"SET"</span>.len()..end_columns].trim();
 
         <span class="kw">let </span>tmp_what_to_update: Vec&lt;String&gt; = columns_str
             .split(<span class="string">','</span>)
@@ -702,11 +689,11 @@
     }
 
     <span class="doccomment">/// Given a SQL Consult, we extract the table name as string.
-    /// 
+    ///
     /// Example
-    /// 
+    ///
     /// SELECT * FROM users WHERE id = 3;
-    /// 
+    ///
     /// Returns "users"
     </span><span class="kw">pub fn </span>extract_table&lt;<span class="lifetime">'a</span>&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
@@ -732,46 +719,38 @@
     }
 
     <span class="doccomment">/// Extracts the position from a QUERY to get the table name
-    /// 
+    ///
     /// Examples. ```SELECT * FROM users WHERE id = 3;``` -&gt; gets FROM as start and WHERE as end, offset will be the length of FROM
-    /// 
+    ///
     /// ```INSERT INTO users (name, age) VALUES ('John', 20);``` -&gt; gets INTO as start and ( as end, offset will be the length of INTO
-    /// 
+    ///
     /// ```UPDATE users SET name = 'John' WHERE id = 3;``` -&gt; gets UPDATE as start and SET as end, offset will be the length of UPDATE
-    /// 
+    ///
     /// ```DELETE FROM users WHERE id = 3;``` -&gt; gets DELETE as start and FROM as end, offset will be the length of DELETE
-    /// 
+    ///
     </span><span class="kw">fn </span>extract_positions(<span class="kw-2">&amp;</span><span class="self">self</span>, query: <span class="kw-2">&amp;</span>str, consult: SQLCommand) -&gt; (usize, usize, usize) {
         <span class="kw">let </span>query = query.trim();
 
-        <span class="kw">let </span>start = <span class="kw">match </span>consult {
-            SQLCommand::Select | SQLCommand::Delete =&gt; query.find(<span class="string">"FROM"</span>).unwrap_or(<span class="number">0</span>),
-            SQLCommand::Insert =&gt; query.find(<span class="string">"INTO"</span>).unwrap_or(<span class="number">0</span>),
-            SQLCommand::Update =&gt; query.find(<span class="string">"UPDATE"</span>).unwrap_or(<span class="number">0</span>),
-        };
-
-        <span class="kw">let </span>offset = <span class="kw">match </span>consult {
-            SQLCommand::Select =&gt; <span class="string">"FROM"</span>.len(),
-            SQLCommand::Insert =&gt; <span class="string">"INTO"</span>.len(),
-            SQLCommand::Update =&gt; <span class="string">"UPDATE"</span>.len(),
-            SQLCommand::Delete =&gt; <span class="string">"FROM"</span>.len(),
+        <span class="kw">let </span>(start, offset) = <span class="kw">match </span>consult {
+            SQLCommand::Select | SQLCommand::Delete =&gt; {
+                <span class="kw">let </span>start = query.find(<span class="string">"FROM"</span>).unwrap_or(<span class="number">0</span>);
+                (start, <span class="string">"FROM"</span>.len())
+            }
+            SQLCommand::Insert =&gt; {
+                <span class="kw">let </span>start = query.find(<span class="string">"INTO"</span>).unwrap_or(<span class="number">0</span>);
+                (start, <span class="string">"INTO"</span>.len())
+            }
+            SQLCommand::Update =&gt; {
+                <span class="kw">let </span>start = query.find(<span class="string">"UPDATE"</span>).unwrap_or(<span class="number">0</span>);
+                (start, <span class="string">"UPDATE"</span>.len())
+            }
         };
 
         <span class="kw">let </span>end = <span class="kw">match </span>consult {
             SQLCommand::Select =&gt; {
-                <span class="kw">match </span>query.find(<span class="string">"WHERE"</span>) {
-                    <span class="comment">// we need to find WHERE, ORDER or ;
-                    </span><span class="prelude-val">Some</span>(pos) =&gt; pos,
-                    <span class="prelude-val">None </span>=&gt; {
-                        <span class="comment">// NO WHERE, so we need to find ORDER or ;
-                        </span><span class="kw">match </span>query.find(<span class="string">"ORDER"</span>) {
-                            <span class="prelude-val">Some</span>(pos) =&gt; pos,
-                            <span class="prelude-val">None </span>=&gt; {
-                                <span class="comment">// NO ORDER, so we need to find ;
-                                </span>query.find(<span class="string">";"</span>).unwrap_or(<span class="number">0</span>)
-                            }
-                        }
-                    }
+                <span class="kw">match </span>query.find(<span class="string">"WHERE"</span>).or(query.find(<span class="string">"ORDER"</span>)) {
+                    <span class="prelude-val">Some</span>(pos) =&gt; pos,
+                    <span class="prelude-val">None </span>=&gt; query.find(<span class="string">";"</span>).unwrap_or(<span class="number">0</span>),
                 }
             }
             SQLCommand::Insert =&gt; {
@@ -795,9 +774,9 @@
     }
 
     <span class="doccomment">/// Given a SQL Consult, we extract the conditions as string.
-    /// 
+    ///
     /// Example
-    /// 
+    ///
     /// ```SELECT * FROM users WHERE id = 3;```
     /// Returns ```id = 3```
     </span><span class="kw">pub fn </span>extract_as_str_conditions&lt;<span class="lifetime">'a</span>&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, query: <span class="kw-2">&amp;</span><span class="lifetime">'a </span>str) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">'a </span>str&gt; {
@@ -805,15 +784,13 @@
 
         <span class="kw">if let </span><span class="prelude-val">Some</span>(pos) = query.find(<span class="string">"WHERE"</span>) {
             <span class="comment">// we need to concat the vector to that position
-            </span><span class="kw">let </span>end = query.find(<span class="string">"ORDER"</span>).or(query.find(<span class="string">";"</span>));
-            <span class="kw">let </span>end = <span class="kw">match </span>end {
+            </span><span class="kw">let </span>end = <span class="kw">match </span>query.find(<span class="string">"ORDER"</span>).or(query.find(<span class="string">";"</span>)) {
                 <span class="prelude-val">Some</span>(end) =&gt; end,
                 <span class="prelude-val">None </span>=&gt; {
                     <span class="kw">return </span><span class="prelude-val">None</span>;
                 }
             };
-            <span class="kw">let </span>conditions = <span class="kw-2">&amp;</span>query[pos + <span class="string">"WHERE"</span>.len()..end];
-            <span class="kw">let </span>conditions = conditions.trim();
+            <span class="kw">let </span>conditions = <span class="kw-2">&amp;</span>query[pos + <span class="string">"WHERE"</span>.len()..end].trim();
             <span class="prelude-val">Some</span>(conditions)
         } <span class="kw">else </span>{
             <span class="comment">// no conditions, but maybe ordered by..
@@ -833,8 +810,7 @@
                 }
             };
 
-            <span class="kw">let </span>orderby = <span class="kw-2">&amp;</span>query[pos + <span class="string">"ORDER BY"</span>.len()..semicolon_end];
-            <span class="kw">let </span>orderby = orderby.trim();
+            <span class="kw">let </span>orderby = <span class="kw-2">&amp;</span>query[pos + <span class="string">"ORDER BY"</span>.len()..semicolon_end].trim();
             <span class="prelude-val">Some</span>(orderby)
         } <span class="kw">else </span>{
             <span class="prelude-val">None
@@ -842,11 +818,11 @@
     }
 
     <span class="doccomment">/// Given a parsed ORDER by clause (previously filtered with extract_orderby_as_str)
-    /// 
+    ///
     /// Returns a vector of tuples which contains the column to order and how
-    /// 
+    ///
     /// True means its gonna be ASC, False means its gonna be DESC
-    /// 
+    ///
     </span><span class="kw">pub fn </span>parser_orderby_from_str_to_vec(<span class="kw-2">&amp;</span><span class="self">self</span>, str_orderby: <span class="kw-2">&amp;</span>str) -&gt; Vec&lt;(String, bool)&gt; {
         str_orderby
             .split(<span class="string">','</span>)
