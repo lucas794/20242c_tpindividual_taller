@@ -27,6 +27,7 @@ impl Condition {
                 "Condition should be separated. Example: Name = 'John'".to_string(),
             ));
         }
+
         let mut i = 0;
         let mut result = true;
         let mut is_negated = false; // Initialize negation to false
@@ -42,6 +43,11 @@ impl Condition {
                     i += 1;
                     result =
                         result && self.evaluate_condition(&splitted_conditions, &mut i, is_negated);
+
+                    if !result {
+                        // a single false in AND is enough
+                        return Ok(false);
+                    }
                     is_negated = false; // Reset negation flag after use
                 }
                 "OR" => {
