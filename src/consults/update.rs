@@ -35,6 +35,11 @@ impl Update {
         false
     }
 
+    /// Execute the update query
+    ///
+    /// UPDATE table_name SET column1 = value1, column2 = value2 WHERE condition;
+    ///
+    /// UPDATE table_name SET column1 = value1, column2 = value2;
     pub fn execute_update(
         &self,
         table: &mut Table,

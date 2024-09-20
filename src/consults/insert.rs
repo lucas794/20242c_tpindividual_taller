@@ -1,6 +1,7 @@
 use crate::errors::tperrors::Tperrors;
 use crate::handler_tables::table::*;
 
+/// Struct to handle the INSERT query.
 pub struct Insert;
 
 impl Default for Insert {
@@ -29,6 +30,7 @@ impl Insert {
         false
     }
 
+    /// Execute the insert query
     pub fn execute_insert(
         &self,
         table: &mut Table,

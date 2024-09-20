@@ -53,3 +53,15 @@ impl FolderTables {
         self.data.get(key).map(|path| path.to_string())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_folder_tables() {
+        let folder = FolderTables::new("./tables").unwrap();
+        let path = folder.get_path("default_file");
+        assert_eq!(path, Some("./tables/default_file.csv".to_string()));
+    }
+}

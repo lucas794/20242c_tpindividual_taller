@@ -1,6 +1,7 @@
 use crate::errors::{fileerrors::FileErrors, tperrors::Tperrors};
 use crate::handler_tables::table::Table;
 
+/// Struct to handle the DELETE query.
 pub struct Delete;
 
 impl Default for Delete {
@@ -13,7 +14,7 @@ impl Delete {
     pub fn new() -> Delete {
         Delete
     }
-
+    /// A valid DELETE query contains DELETE and FROM AND ends with ;
     pub fn is_valid_query(&self, query: &str) -> bool {
         let query = query.trim();
 
@@ -26,6 +27,7 @@ impl Delete {
         false
     }
 
+    /// Execute the delete query
     pub fn execute_delete(
         &self,
         table: &mut Table,
