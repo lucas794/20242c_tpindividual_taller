@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["Delete","Insert","Select","Update"]};
+window.SIDEBAR_ITEMS = {"mod":["delete","insert","select","update"]};

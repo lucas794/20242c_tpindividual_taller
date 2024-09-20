@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["Value"],"struct":["Conditions"]};
+window.SIDEBAR_ITEMS = {"mod":["condition","value"]};
