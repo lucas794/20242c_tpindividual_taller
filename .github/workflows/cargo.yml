@@ -17,6 +17,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Run cargo fmt --check
+      run: cargo fmt --check 
+    
     - name: Build
       run: cargo build --verbose
 
