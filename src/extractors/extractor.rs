@@ -18,10 +18,7 @@ impl Extractor {
     /// Example
     /// SELECT name, age FROM table;
     /// Returns ["name", "age"]
-    pub fn extract_columns_for_select(
-        &self,
-        query: &str,
-    ) -> Result<Vec<String>, Tperrors<'static>> {
+    pub fn extract_columns_for_select(&self, query: &str) -> Result<Vec<String>, Tperrors> {
         let query = query.trim();
 
         let where_pos = query.find("FROM");
@@ -42,9 +39,9 @@ impl Extractor {
 
                 Ok(columns)
             }
-            None => {
-                return Err(Tperrors::Syntax("Invalid select query (Missing FROM)"));
-            }
+            None => Err(Tperrors::Syntax(
+                "Invalid select query (Missing FROM)".to_string(),
+            )),
         }
     }
 
@@ -58,18 +55,22 @@ impl Extractor {
     pub fn extract_columns_and_values_for_insert(
         &self,
         query: &str,
-    ) -> Result<(Vec<String>, Vec<String>), Tperrors<'static>> {
+    ) -> Result<(Vec<String>, Vec<String>), Tperrors> {
         let (start_columns, end_columns) = match (query.find("("), query.find(")")) {
             (Some(start), Some(end)) => (start, end),
             _ => {
-                return Err(Tperrors::Syntax("Invalid INSERT query (Missing columns)"));
+                return Err(Tperrors::Syntax(
+                    "Invalid INSERT query (Missing columns)".to_string(),
+                ));
             }
         };
 
         let (start_values, end_values) = match (query.rfind("("), query.rfind(")")) {
             (Some(start), Some(end)) => (start, end),
             _ => {
-                return Err(Tperrors::Syntax("Invalid INSERT query (Missing values)"));
+                return Err(Tperrors::Syntax(
+                    "Invalid INSERT query (Missing values)".to_string(),
+                ));
             }
         };
 
@@ -97,7 +98,7 @@ impl Extractor {
         // if len doesnt match we return an error
         if columns.len() != values.len() {
             return Err(Tperrors::Syntax(
-                "Invalid INSERT query (Columns and values do not match)",
+                "Invalid INSERT query (Columns and values do not match)".to_string(),
             ));
         }
 
@@ -117,13 +118,13 @@ impl Extractor {
     pub fn extract_columns_and_values_for_update(
         &self,
         query: &str,
-    ) -> Result<(Vec<String>, Vec<String>), Tperrors<'static>> {
+    ) -> Result<(Vec<String>, Vec<String>), Tperrors> {
         let (start_columns, end_columns) = match (query.find("SET"), query.find("WHERE")) {
             (Some(start), Some(end)) => (start, end),
             (Some(start), None) => (start, query.len() - 1), // no WHERE, it means ALL tables.., risky..
             _ => {
                 return Err(Tperrors::Syntax(
-                    "Invalid UPDATE query (Missing SET or WHERE)",
+                    "Invalid UPDATE query (Missing SET or WHERE)".to_string(),
                 ));
             }
         };
@@ -144,7 +145,9 @@ impl Extractor {
             let what_to_update = what_to_update.split('=').collect::<Vec<&str>>();
 
             if what_to_update.len() != 2 {
-                return Err(Tperrors::Syntax("Invalid UPDATE query (Missing =)"));
+                return Err(Tperrors::Syntax(
+                    "Invalid UPDATE query (Missing =)".to_string(),
+                ));
             }
 
             let column = what_to_update[0].trim().to_string();
@@ -167,17 +170,15 @@ impl Extractor {
         &self,
         query: &'a str,
         consult: SQLCommand,
-    ) -> Result<&'a str, Tperrors<'static>> {
+    ) -> Result<&'a str, Tperrors> {
         let query = query.trim();
 
         let (start, offset, end) = self.extract_positions(query, consult);
 
         match (start, end) {
-            (0, 0) => {
-                return Err(Tperrors::Syntax(
-                    "Invalid query (Missing any KEY words on your consult)",
-                ));
-            }
+            (0, 0) => Err(Tperrors::Syntax(
+                "Invalid query (Missing any KEY words on your consult)".to_string(),
+            )),
             _ => {
                 let table_data = &query[start + offset..end];
                 let table_data = table_data.trim();

@@ -1,13 +1,13 @@
 use std::fmt::{Display, Formatter, Result};
 
 #[derive(Debug)]
-pub enum Tperrors<'a> {
-    Table(&'a str),
-    Syntax(&'a str),
-    Generic(&'a str),
+pub enum Tperrors {
+    Table(String),
+    Syntax(String),
+    Generic(String),
 }
 
-impl<'a> Display for Tperrors<'a> {
+impl Display for Tperrors {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             Tperrors::Generic(e) => write!(f, "ERROR {}", e),

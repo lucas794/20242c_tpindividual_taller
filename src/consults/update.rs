@@ -1,5 +1,6 @@
 use crate::errors::fileerrors::*;
-use crate::{errors::tperrors::Tperrors, table::Table};
+use crate::errors::tperrors::Tperrors;
+use crate::handler_tables::table::*;
 
 pub struct Update;
 
@@ -49,19 +50,21 @@ impl Update {
                     Ok(_) => {}
                     Err(e) => match e {
                         FileErrors::DeletionFailed => {
-                            return Err(Tperrors::Generic("Deletion failed"));
+                            return Err(Tperrors::Generic("Deletion failed".to_string()));
                         }
                         FileErrors::InvalidFile => {
-                            return Err(Tperrors::Generic("Error while updating the file"));
+                            return Err(Tperrors::Generic(
+                                "Error while updating the file".to_string(),
+                            ));
                         }
                     },
                 }
 
                 Ok(())
             }
-            Err(_) => {
-                return Err(Tperrors::Syntax("Invalid columns inside the query"));
-            }
+            Err(_) => Err(Tperrors::Syntax(
+                "Invalid columns inside the query".to_string(),
+            )),
         }
     }
 }

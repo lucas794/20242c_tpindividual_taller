@@ -1,5 +1,5 @@
 use crate::errors::tperrors::*;
-use crate::table::Table;
+use crate::handler_tables::table::*;
 
 pub struct Select;
 
@@ -52,8 +52,9 @@ impl Select {
                 }
                 Ok(())
             }
-            Err(_) => {
-                return Err(Tperrors::Syntax("Invalid columns inside the query"));
+            Err(e) => {
+                let formatted_error = format!("{}", e);
+                Err(Tperrors::Generic(formatted_error))
             }
         }
     }
@@ -78,7 +79,7 @@ mod tests {
 
     #[test]
     fn execute_select_fails_with_invalid_columns() {
-        let mut table = Table::new("./tests/database.csv").unwrap();
+        let mut table = Table::new("./tests/test_tables/database.csv".to_string()).unwrap();
         let select = Select::new();
         // i'm trying to select a column that does not exist
         let columns = vec!["Trabajo Profesional".to_string()];

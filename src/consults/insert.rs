@@ -1,4 +1,5 @@
-use crate::{errors::tperrors::Tperrors, table::Table};
+use crate::errors::tperrors::Tperrors;
+use crate::handler_tables::table::*;
 
 pub struct Insert;
 
@@ -43,16 +44,12 @@ impl Insert {
                 line.push('\n');
                 match table.insert_line_to_csv(line) {
                     Ok(_) => Ok(()),
-                    Err(_) => {
-                        return Err(Tperrors::Generic("Error while inserting line"));
-                    }
+                    Err(_) => Err(Tperrors::Generic("Error while inserting line".to_string())),
                 }
             }
-            Err(_) => {
-                return Err(Tperrors::Generic(
-                    "Invalid columns inside the query / mismatch with the table",
-                ));
-            }
+            Err(_) => Err(Tperrors::Generic(
+                "Invalid columns inside the query / mismatch with the table".to_string(),
+            )),
         }
     }
 }

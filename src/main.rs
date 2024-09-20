@@ -2,8 +2,10 @@ use tp_individual::{
     consults::{delete::Delete, insert::Insert, select::Select, update::Update},
     errors::tperrors::Tperrors,
     extractors::{extractor::Extractor, sqlcommand::SQLCommand},
-    table::Table,
+    handler_tables::folder_tables::FolderTables,
 };
+
+use tp_individual::handler_tables::table::Table;
 
 fn main() {
     // lets read the args
@@ -24,53 +26,21 @@ fn valid_number_of_args(args: &usize) -> bool {
     true
 }
 
-/// This function checks if the table selected in the query is the same as the table that is being used
-fn check_valid_table(
-    extractor: &Extractor,
-    table: &Table,
-    consult: &str,
-    method: SQLCommand,
-) -> Result<(), Tperrors<'static>> {
-    match extractor.extract_table(consult, method) {
-        Ok(table_name_from_query) => {
-            let table_name = match table.get_file_name() {
-                Ok(table_name) => table_name,
-                Err(e) => {
-                    return Err(e);
-                }
-            };
-
-            if table_name_from_query != table_name {
-                return Err(Tperrors::Table("Invalid table selected"));
-            }
-        }
-        Err(e) => {
-            return Err(e);
-        }
-    };
-    Ok(())
-}
 /// Executes the main logical problem of the program
-fn run(args: Vec<String>) -> Result<(), Tperrors<'static>> {
+fn run(args: Vec<String>) -> Result<(), Tperrors> {
     if !valid_number_of_args(&args.len()) {
         // we stop the program, invalid number of arguments
-        return Err(Tperrors::Generic("Invalid number of arguments"));
+        return Err(Tperrors::Generic("Invalid number of arguments".to_string()));
     }
 
     // Now, we have the arguments...
     let file = &args[1];
     let consult = &args[2].trim();
 
-    let opening_table = Table::new(file);
-
-    let mut table = match opening_table {
-        Ok(table) => table,
-        Err(_) => {
-            return Err(Tperrors::Table(
-                "Error opening the table - The selected table is invalid",
-            ));
-        }
-    };
+    let folder_tables = FolderTables::new(file).unwrap_or_else(|e| {
+        eprintln!("{}", e);
+        std::process::exit(1);
+    });
 
     let splitted_consult = consult.split(" ").collect::<Vec<&str>>();
     let command = splitted_consult[0];
@@ -81,138 +51,184 @@ fn run(args: Vec<String>) -> Result<(), Tperrors<'static>> {
         "SELECT" => {
             let select = Select;
 
-            if !select.is_valid_query(consult) {
-                return Err(Tperrors::Syntax(
-                    "Invalid select query (Missing either SELECT , FROM or ;)",
-                ));
-            }
-
-            // checking if its a valid table
-            match check_valid_table(&extractor, &table, consult, SQLCommand::Select) {
+            match resolve_select(&extractor, folder_tables, consult, select) {
                 Ok(_) => {}
                 Err(e) => {
                     return Err(e);
                 }
             };
-
-            // lets get the columns selected from the query
-            let columns = match extractor.extract_columns_for_select(consult) {
-                Ok(columns) => columns,
-                Err(e) => {
-                    return Err(e);
-                }
-            };
-
-            // Conditions of the query (if they exists)
-            let conditions = extractor.extract_as_str_conditions(consult);
-
-            // Sorting method (if existst)
-            let sorting_vector = match extractor.extract_orderby_as_str(consult) {
-                Some(sorting) => {
-                    let vec_sort = extractor.parser_orderby_from_str_to_vec(sorting);
-                    Some(vec_sort)
-                }
-                None => None,
-            };
-
-            // lets execute the query
-            let result = select.execute_select(&mut table, columns, conditions, sorting_vector);
-
-            if result.is_err() {
-                return Err(Tperrors::Syntax("Invalid columns inside the query"));
-            }
-
-            return Ok(());
         }
         "INSERT" => {
             let insert = Insert;
 
-            if !insert.is_valid_query(consult) {
-                return Err(Tperrors::Syntax(
-                    "Invalid insert query (Missing either INSERT INTO, VALUES or ;)",
-                ));
-            }
-
-            match check_valid_table(&extractor, &table, consult, SQLCommand::Insert) {
+            match resolve_insert(&extractor, folder_tables, consult, insert) {
                 Ok(_) => {}
                 Err(e) => {
                     return Err(e);
                 }
             };
-
-            let (columns, values) = match extractor.extract_columns_and_values_for_insert(consult) {
-                Ok((columns, values)) => (columns, values),
-                Err(e) => {
-                    return Err(e);
-                }
-            };
-            let result = insert.execute_insert(&mut table, columns, values);
-
-            if result.is_err() {
-                return Err(Tperrors::Syntax("Invalid columns inside the query"));
-            }
-
-            return Ok(());
         }
         "UPDATE" => {
             let update = Update;
 
-            if !update.is_valid_query(consult) {
-                return Err(Tperrors::Syntax(
-                    "Invalid update query (Missing either UPDATE, SET, WHERE or ;)",
-                ));
-            }
-
-            match check_valid_table(&extractor, &table, consult, SQLCommand::Update) {
+            match resolve_update(&extractor, folder_tables, consult, update) {
                 Ok(_) => {}
                 Err(e) => {
                     return Err(e);
                 }
             };
-
-            let (columns, values) = match extractor.extract_columns_and_values_for_update(consult) {
-                Ok((columns, values)) => (columns, values),
-                Err(e) => {
-                    return Err(e);
-                }
-            };
-
-            let conditions = extractor.extract_as_str_conditions(consult);
-
-            let result = update.execute_update(&mut table, columns, values, conditions);
-
-            if result.is_err() {
-                return Err(Tperrors::Syntax("Invalid columns inside the query"));
-            }
         }
         "DELETE" => {
             let delete = Delete;
 
-            if !delete.is_valid_query(consult) {
-                return Err(Tperrors::Syntax(
-                    "Invalid delete query (Missing either DELETE, FROM or ;)",
-                ));
-            }
-
-            // checking if its a valid table
-            match check_valid_table(&extractor, &table, consult, SQLCommand::Delete) {
+            match resolve_delete(&extractor, folder_tables, consult, delete) {
                 Ok(_) => {}
                 Err(e) => {
                     return Err(e);
                 }
             };
-
-            let conditions = extractor.extract_as_str_conditions(consult);
-
-            let result = delete.execute_delete(&mut table, conditions);
-
-            if result.is_err() {
-                return Err(Tperrors::Generic("Something happened with the deletion"));
-            }
         }
         _ => {
-            return Err(Tperrors::Syntax("Invalid command"));
+            return Err(Tperrors::Syntax("Invalid command".to_string()));
         }
     }
     Ok(())
+}
+
+/// Given a consult, command a folder_table instance
+///
+/// Returns a Table instance to work with
+///
+/// If the table is not found, returns an error
+fn return_proper_table_to_work_with(
+    extractor: &Extractor,
+    folder_tables: FolderTables,
+    consult: &str,
+    command: SQLCommand,
+) -> Result<Table, Tperrors> {
+    let extracted_table_name = match extractor.extract_table(consult, command) {
+        Ok(table_name) => table_name,
+        Err(e) => {
+            return Err(e);
+        }
+    };
+
+    let table: Table = match folder_tables.get_path(extracted_table_name) {
+        Some(table_path) => Table::new(table_path).unwrap_or_else(|e| {
+            eprintln!("{}", e);
+            std::process::exit(1);
+        }),
+
+        None => {
+            return Err(Tperrors::Table("Table not found in the folder".to_string()));
+        }
+    };
+
+    Ok(table)
+}
+fn resolve_select(
+    extractor: &Extractor,
+    folder_tables: FolderTables,
+    consult: &str,
+    select: Select,
+) -> Result<(), Tperrors> {
+    let mut table =
+        return_proper_table_to_work_with(extractor, folder_tables, consult, SQLCommand::Select)?;
+
+    if !select.is_valid_query(consult) {
+        return Err(Tperrors::Syntax(
+            "Invalid select query (Missing either SELECT , FROM or ;)".to_string(),
+        ));
+    }
+
+    // lets get the columns selected from the query
+    let columns = match extractor.extract_columns_for_select(consult) {
+        Ok(columns) => columns,
+        Err(e) => {
+            return Err(e);
+        }
+    };
+
+    // Conditions of the query (if they exists)
+    let conditions = extractor.extract_as_str_conditions(consult);
+
+    // Sorting method (if existst)
+    let sorting_vector = match extractor.extract_orderby_as_str(consult) {
+        Some(sorting) => {
+            let vec_sort = extractor.parser_orderby_from_str_to_vec(sorting);
+            Some(vec_sort)
+        }
+        None => None,
+    };
+
+    // lets execute the query
+    select.execute_select(&mut table, columns, conditions, sorting_vector)
+}
+
+fn resolve_insert(
+    extractor: &Extractor,
+    folder_tables: FolderTables,
+    consult: &str,
+    insert: Insert,
+) -> Result<(), Tperrors> {
+    let mut table =
+        return_proper_table_to_work_with(extractor, folder_tables, consult, SQLCommand::Insert)?;
+    if !insert.is_valid_query(consult) {
+        return Err(Tperrors::Syntax(
+            "Invalid insert query (Missing either INSERT INTO, VALUES or ;)".to_string(),
+        ));
+    }
+
+    let (columns, values) = match extractor.extract_columns_and_values_for_insert(consult) {
+        Ok((columns, values)) => (columns, values),
+        Err(e) => {
+            return Err(e);
+        }
+    };
+    insert.execute_insert(&mut table, columns, values)
+}
+
+fn resolve_update(
+    extractor: &Extractor,
+    folder_tables: FolderTables,
+    consult: &str,
+    update: Update,
+) -> Result<(), Tperrors> {
+    let mut table =
+        return_proper_table_to_work_with(extractor, folder_tables, consult, SQLCommand::Update)?;
+    if !update.is_valid_query(consult) {
+        return Err(Tperrors::Syntax(
+            "Invalid update query (Missing either UPDATE, SET, WHERE or ;)".to_string(),
+        ));
+    }
+
+    let (columns, values) = match extractor.extract_columns_and_values_for_update(consult) {
+        Ok((columns, values)) => (columns, values),
+        Err(e) => {
+            return Err(e);
+        }
+    };
+
+    let conditions = extractor.extract_as_str_conditions(consult);
+
+    update.execute_update(&mut table, columns, values, conditions)
+}
+
+fn resolve_delete(
+    extractor: &Extractor,
+    folder_tables: FolderTables,
+    consult: &str,
+    delete: Delete,
+) -> Result<(), Tperrors> {
+    let mut table =
+        return_proper_table_to_work_with(extractor, folder_tables, consult, SQLCommand::Delete)?;
+    if !delete.is_valid_query(consult) {
+        return Err(Tperrors::Syntax(
+            "Invalid delete query (Missing either DELETE, FROM, WHERE or ;)".to_string(),
+        ));
+    }
+
+    let conditions = extractor.extract_as_str_conditions(consult);
+
+    delete.execute_delete(&mut table, conditions)
 }

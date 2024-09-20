@@ -1,3 +1,5 @@
+use crate::errors::tperrors::Tperrors;
+
 use super::value::Value;
 
 /// representation of the condition that can be used on a query
@@ -17,12 +19,14 @@ impl Condition {
     ///
     /// a query with ```"Name = 'John'"``` will return true
     ///
-    pub fn matches_condition(&self, conditions: &str) -> bool {
+    pub fn matches_condition(&self, conditions: &str) -> Result<bool, Tperrors> {
         let splitted_conditions = conditions.split_whitespace().collect::<Vec<&str>>();
 
-        /*if (splitted_conditions.len() % 2) == 0 {
-            return false; // Invalid number of tokens
-        }*/
+        if splitted_conditions.len() <= 1 {
+            return Err(Tperrors::Syntax(
+                "Condition should be separated. Example: Name = 'John'".to_string(),
+            ));
+        }
         let mut i = 0;
         let mut result = true;
         let mut is_negated = false; // Initialize negation to false
@@ -48,7 +52,7 @@ impl Condition {
                     is_negated = false; // Reset negation flag after use
                     if result {
                         // a single true in OR is enough
-                        return true;
+                        return Ok(true);
                     }
                 }
                 _ => {
@@ -57,7 +61,7 @@ impl Condition {
                 }
             }
         }
-        result
+        Ok(result)
     }
 
     /// given a condition, it will evaluate if the condition is met
@@ -66,9 +70,9 @@ impl Condition {
             return false; // Avoid out-of-bounds access
         }
 
-        let column = &conditions[*i].trim_matches('\'');
+        let column = &conditions[*i].trim_matches('\'').trim_matches('\"');
         let operator = &conditions[*i + 1];
-        let value = &conditions[*i + 2].trim_matches('\'');
+        let value = &conditions[*i + 2].trim_matches('\'').trim_matches('\"');
 
         *i += 3; // Advance the index
 
@@ -158,7 +162,7 @@ mod test {
         ];
 
         for str_condition in str_conditions {
-            assert_eq!(conditions.matches_condition(str_condition), true);
+            assert_eq!(conditions.matches_condition(str_condition).unwrap(), true);
         }
     }
 
@@ -174,7 +178,7 @@ mod test {
         let str_conditions = vec!["name = 'John'", "age = 20 OR name = 'John'"];
 
         for str_condition in str_conditions {
-            assert_eq!(conditions.matches_condition(str_condition), true);
+            assert_eq!(conditions.matches_condition(str_condition).unwrap(), true);
         }
     }
 
@@ -190,7 +194,7 @@ mod test {
         ];
 
         for str_condition in str_conditions {
-            assert_ne!(conditions.matches_condition(str_condition), false);
+            assert_ne!(conditions.matches_condition(str_condition).unwrap(), false);
         }
     }
 
@@ -208,7 +212,7 @@ mod test {
         ];
 
         for str_condition in str_conditions {
-            assert_eq!(conditions.matches_condition(str_condition), true);
+            assert_eq!(conditions.matches_condition(str_condition).unwrap(), true);
         }
     }
 }
