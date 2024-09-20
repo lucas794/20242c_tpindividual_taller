@@ -5,17 +5,17 @@ use std::{
     io::{BufRead, BufReader, BufWriter, Seek, SeekFrom, Write},
 };
 
-use crate::{
-    conditions::{Conditions, Value},
-    errors::*,
-};
+use crate::conditions::{condition::Condition, value::Value};
+
+use crate::errors::fileerrors::*;
+use crate::errors::tperrors::*;
 
 pub struct Table<'a> {
     file_name: &'a str,
     file: File,
 }
 
-// lets implement a comparator to sort a vector 
+// lets implement a comparator to sort a vector
 
 impl<'a> Table<'a> {
     pub fn new(file_name: &'a str) -> Result<Self, std::io::Error> {
@@ -46,11 +46,11 @@ impl<'a> Table<'a> {
     /// ```./path/table.csv``` -> table
     ///
     /// ```./table.csv``` -> table
-    pub fn get_file_name(&self) -> Result<&'a str, TPErrors<'static>> {
+    pub fn get_file_name(&self) -> Result<&'a str, Tperrors<'static>> {
         let table_file = match self.file_name.split("/").last() {
             Some(name) => name,
             None => {
-                return Err(TPErrors::Generic(
+                return Err(Tperrors::Generic(
                     "Error getting table file name by unknown reason",
                 ));
             }
@@ -60,7 +60,7 @@ impl<'a> Table<'a> {
         let table_name = match table_file.split(".").next() {
             Some(name) => name,
             None => {
-                return Err(TPErrors::Generic(
+                return Err(Tperrors::Generic(
                     "Error getting table name, splitting by '.' failed",
                 ));
             }
@@ -137,7 +137,7 @@ impl<'a> Table<'a> {
                     self.extract_conditions(&index_columns, &splitted_line, &columns);
 
                 // now everything is clear and ready to check if conditions are met
-                let condition = Conditions::new(extracted_conditions);
+                let condition = Condition::new(extracted_conditions);
                 let str_conditions = opt_conditions_as_str.unwrap_or("");
 
                 if condition.matches_condition(str_conditions) {
@@ -341,7 +341,7 @@ impl<'a> Table<'a> {
                     );
 
                     // lets see all keys and values
-                    let condition = Conditions::new(vec_conditions);
+                    let condition = Condition::new(vec_conditions);
 
                     // lets see all keys and values
                     if condition.matches_condition(str_conditions) {
@@ -463,7 +463,7 @@ impl<'a> Table<'a> {
                         &splitted_columns_as_string,
                     );
                     // lets see all keys and values
-                    let condition = Conditions::new(hashed_conditions);
+                    let condition = Condition::new(hashed_conditions);
 
                     // lets see all keys and values
                     if !condition.matches_condition(str_conditions) {

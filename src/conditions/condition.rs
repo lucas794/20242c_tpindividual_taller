@@ -1,23 +1,14 @@
-// tried recursive descent parser but i lost so much time at this point.
-/// representation of the type of value can be used for conditions
-
-pub enum Value {
-    /// For now we only support int & string.
-    Integer(i64),
-    String(String), // tried lifetime, hell no.
-                    // pls dont ask for other type.
-}
+use super::value::Value;
 
 /// representation of the condition that can be used on a query
-pub struct Conditions {
-    // i got nightmares with &str.. so i will use String
+pub struct Condition {
     data: Vec<(String, Value)>,
 }
 
 /// implementation of conditions, will be used to check if the conditions are met
-impl Conditions {
+impl Condition {
     pub fn new(data: Vec<(String, Value)>) -> Self {
-        Conditions { data }
+        Condition { data }
     }
 
     /// given a condition as STR it will return if the condition is met
@@ -29,6 +20,9 @@ impl Conditions {
     pub fn matches_condition(&self, conditions: &str) -> bool {
         let splitted_conditions = conditions.split_whitespace().collect::<Vec<&str>>();
 
+        /*if (splitted_conditions.len() % 2) == 0 {
+            return false; // Invalid number of tokens
+        }*/
         let mut i = 0;
         let mut result = true;
         let mut is_negated = false; // Initialize negation to false
@@ -156,7 +150,7 @@ mod test {
             ("age".to_string(), Value::Integer(20)),
         ]);
 
-        let conditions = Conditions::new(condition_hash);
+        let conditions = Condition::new(condition_hash);
 
         let str_conditions = vec![
             "name = 'John' AND age = 20",
@@ -175,7 +169,7 @@ mod test {
             ("age".to_string(), Value::Integer(20)),
         ]);
 
-        let conditions = Conditions::new(condition_hash);
+        let conditions = Condition::new(condition_hash);
 
         let str_conditions = vec!["name = 'John'", "age = 20 OR name = 'John'"];
 
@@ -189,7 +183,7 @@ mod test {
         let condition_hash: Vec<(String, Value)> =
             Vec::from([("age".to_string(), Value::Integer(20))]);
 
-        let conditions = Conditions::new(condition_hash);
+        let conditions = Condition::new(condition_hash);
 
         let str_conditions = vec![
             "NOT age != 20", // not
@@ -202,7 +196,7 @@ mod test {
 
     #[test]
     fn condition_multiple_or_with_same_column() {
-        let conditions = Conditions::new(Vec::from([
+        let conditions = Condition::new(Vec::from([
             ("name".to_string(), Value::String("John".to_string())),
             ("age".to_string(), Value::Integer(20)),
         ]));
