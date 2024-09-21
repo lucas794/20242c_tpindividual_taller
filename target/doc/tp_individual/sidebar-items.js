@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":["conditions","consults","errors","extractors","handler_tables"]};
+window.SIDEBAR_ITEMS = {"mod":["conditions","consults","errors","extractors","handler_tables","sorter"]};

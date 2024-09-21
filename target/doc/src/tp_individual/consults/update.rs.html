@@ -73,6 +73,17 @@
 <a href="#73" id="73">73</a>
 <a href="#74" id="74">74</a>
 <a href="#75" id="75">75</a>
+<a href="#76" id="76">76</a>
+<a href="#77" id="77">77</a>
+<a href="#78" id="78">78</a>
+<a href="#79" id="79">79</a>
+<a href="#80" id="80">80</a>
+<a href="#81" id="81">81</a>
+<a href="#82" id="82">82</a>
+<a href="#83" id="83">83</a>
+<a href="#84" id="84">84</a>
+<a href="#85" id="85">85</a>
+<a href="#86" id="86">86</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::errors::fileerrors::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::errors::tperrors::Tperrors;
 <span class="kw">use </span><span class="kw">crate</span>::handler_tables::table::<span class="kw-2">*</span>;
@@ -142,9 +153,20 @@
 
                 <span class="prelude-val">Ok</span>(())
             }
-            <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Err</span>(Tperrors::Syntax(
-                <span class="string">"Invalid columns inside the query"</span>.to_string(),
-            )),
+            <span class="prelude-val">Err</span>(e) =&gt; {
+                <span class="kw">let </span>formatted_error = <span class="macro">format!</span>(<span class="string">"{}"</span>, e);
+                <span class="kw">let </span>dots = formatted_error.find(<span class="string">":"</span>).unwrap_or_default();
+                <span class="kw">if </span>formatted_error.contains(<span class="string">"SYNTAX"</span>) {
+                    <span class="kw">let </span>formatted_error = formatted_error[dots + <span class="number">1</span>..].trim().to_string();
+                    <span class="prelude-val">Err</span>(Tperrors::Syntax(formatted_error))
+                } <span class="kw">else if </span>formatted_error.contains(<span class="string">"COLUMN"</span>) {
+                    <span class="kw">let </span>formatted_error = formatted_error[dots + <span class="number">1</span>..].trim().to_string();
+                    <span class="prelude-val">Err</span>(Tperrors::Table(formatted_error))
+                } <span class="kw">else </span>{
+                    <span class="kw">let </span>formatted_error = formatted_error[dots + <span class="number">1</span>..].trim().to_string();
+                    <span class="prelude-val">Err</span>(Tperrors::Generic(formatted_error))
+                }
+            }
         }
     }
 }

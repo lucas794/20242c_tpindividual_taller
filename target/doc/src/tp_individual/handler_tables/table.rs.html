@@ -638,6 +638,17 @@
 <a href="#638" id="638">638</a>
 <a href="#639" id="639">639</a>
 <a href="#640" id="640">640</a>
+<a href="#641" id="641">641</a>
+<a href="#642" id="642">642</a>
+<a href="#643" id="643">643</a>
+<a href="#644" id="644">644</a>
+<a href="#645" id="645">645</a>
+<a href="#646" id="646">646</a>
+<a href="#647" id="647">647</a>
+<a href="#648" id="648">648</a>
+<a href="#649" id="649">649</a>
+<a href="#650" id="650">650</a>
+<a href="#651" id="651">651</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{
     cmp::Ordering,
     collections::HashMap,
@@ -645,7 +656,10 @@
     io::{BufRead, BufReader, BufWriter, Seek, SeekFrom, Write},
 };
 
-<span class="kw">use </span><span class="kw">crate</span>::conditions::{condition::Condition, value::Value};
+<span class="kw">use crate</span>::{
+    conditions::{condition::Condition, value::Value},
+    sorter::sort::SortMethod,
+};
 
 <span class="kw">use </span><span class="kw">crate</span>::errors::fileerrors::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::errors::tperrors::<span class="kw-2">*</span>;
@@ -719,11 +733,12 @@
     /// ```SELECT Nombre FROM table WHERE Apellido = 'Doe' ORDER BY Nombre ASC;```
     ///
     /// The result will be a vector of vector of string (The content readed from the csv)
+
     </span><span class="kw">pub fn </span>resolve_select(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         columns: Vec&lt;String&gt;,
         opt_conditions_as_str: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>str&gt;,
-        vector_sorting: <span class="prelude-ty">Option</span>&lt;Vec&lt;(String, bool)&gt;&gt;,
+        vector_sorting: <span class="prelude-ty">Option</span>&lt;Vec&lt;SortMethod&gt;&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;Vec&lt;String&gt;&gt;, std::io::Error&gt; {
         <span class="comment">// we need to match the index of the columns with the index of the csv
         // we need to read the csv and get the columns
@@ -790,11 +805,9 @@
                     <span class="prelude-val">Ok</span>(<span class="bool-val">false</span>) =&gt; {
                         <span class="comment">// we do nothing
                     </span>}
-                    <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
-                        <span class="kw">return </span><span class="prelude-val">Err</span>(std::io::Error::new(
-                            std::io::ErrorKind::Other,
-                            <span class="string">"Error checking conditions"</span>.to_string(),
-                        ));
+                    <span class="prelude-val">Err</span>(e) =&gt; {
+                        <span class="kw">let </span>e = e.to_string();
+                        <span class="kw">return </span><span class="prelude-val">Err</span>(std::io::Error::new(std::io::ErrorKind::Other, e));
                     }
                 }
             } <span class="kw">else </span>{
@@ -811,7 +824,10 @@
         <span class="comment">// lets sort the vector if we have a sorting method..
         </span><span class="kw">if let </span><span class="prelude-val">Some</span>(sorting) = vector_sorting {
             <span class="comment">// first, let check if the columns are valid
-            </span><span class="kw">let </span>columns_from_query = sorting.iter().map(|(c, <span class="kw">_</span>)| c).collect::&lt;Vec&lt;<span class="kw-2">&amp;</span>String&gt;&gt;();
+            </span><span class="kw">let </span>columns_from_query = sorting
+                .iter()
+                .map(|method| method.get_by_column())
+                .collect::&lt;Vec&lt;<span class="kw-2">&amp;</span>String&gt;&gt;();
             <span class="kw">if </span>!columns_from_query.iter().all(|c| columns.contains(c)) {
                 <span class="kw">return </span><span class="prelude-val">Err</span>(std::io::Error::new(
                     std::io::ErrorKind::Other,
@@ -821,21 +837,24 @@
 
             <span class="comment">// now sorting the vector
             </span>result.sort_by(|a, b| {
-                <span class="kw">for </span>(column, asc) <span class="kw">in </span><span class="kw-2">&amp;</span>sorting {
+                <span class="kw">for </span>method <span class="kw">in </span><span class="kw-2">&amp;</span>sorting {
+                    <span class="kw">let </span>column = method.get_by_column();
+                    <span class="kw">let </span>asc = method.is_ascending();
+
                     <span class="kw">let </span>index = columns.iter().position(|c| c == column).unwrap();
                     <span class="kw">let </span>a_value = a[index].as_str();
                     <span class="kw">let </span>b_value = b[index].as_str();
 
                     <span class="kw">match </span>a_value.cmp(b_value) {
                         Ordering::Less =&gt; {
-                            <span class="kw">if </span><span class="kw-2">*</span>asc {
+                            <span class="kw">if </span>asc {
                                 <span class="kw">return </span>Ordering::Less;
                             } <span class="kw">else </span>{
                                 <span class="kw">return </span>Ordering::Greater;
                             }
                         }
                         Ordering::Greater =&gt; {
-                            <span class="kw">if </span><span class="kw-2">*</span>asc {
+                            <span class="kw">if </span>asc {
                                 <span class="kw">return </span>Ordering::Greater;
                             } <span class="kw">else </span>{
                                 <span class="kw">return </span>Ordering::Less;
@@ -1244,7 +1263,10 @@
 
         <span class="kw">let </span>conditions: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>str&gt; = <span class="prelude-val">None</span>;
 
-        <span class="kw">let </span>sorting = <span class="prelude-val">Some</span>(<span class="macro">vec!</span>[(<span class="string">"Profesion"</span>.to_string(), <span class="bool-val">true</span>)]);
+        <span class="kw">let </span>sorting = <span class="prelude-val">Some</span>(<span class="macro">vec!</span>[SortMethod {
+            by_column: <span class="string">"Profesion"</span>.to_string(),
+            ascending: <span class="bool-val">true</span>,
+        }]);
 
         <span class="comment">// at t his point, we have this consult.
         // SELECT Nombre, Edad FROM test ORDER BY Profesion;

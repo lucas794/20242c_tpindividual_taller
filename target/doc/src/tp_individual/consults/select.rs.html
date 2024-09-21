@@ -91,8 +91,20 @@
 <a href="#91" id="91">91</a>
 <a href="#92" id="92">92</a>
 <a href="#93" id="93">93</a>
+<a href="#94" id="94">94</a>
+<a href="#95" id="95">95</a>
+<a href="#96" id="96">96</a>
+<a href="#97" id="97">97</a>
+<a href="#98" id="98">98</a>
+<a href="#99" id="99">99</a>
+<a href="#100" id="100">100</a>
+<a href="#101" id="101">101</a>
+<a href="#102" id="102">102</a>
+<a href="#103" id="103">103</a>
+<a href="#104" id="104">104</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::errors::tperrors::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::handler_tables::table::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::sorter::sort::SortMethod;
 
 <span class="kw">pub struct </span>Select;
 
@@ -133,7 +145,7 @@
         table: <span class="kw-2">&amp;mut </span>Table,
         columns: Vec&lt;String&gt;,
         conditions: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>str&gt;,
-        sorting_method: <span class="prelude-ty">Option</span>&lt;Vec&lt;(String, bool)&gt;&gt;,
+        sorting_method: <span class="prelude-ty">Option</span>&lt;Vec&lt;SortMethod&gt;&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), Tperrors&gt; {
         <span class="kw">let </span>csv_data = table.resolve_select(columns, conditions, sorting_method);
 
@@ -147,7 +159,17 @@
             }
             <span class="prelude-val">Err</span>(e) =&gt; {
                 <span class="kw">let </span>formatted_error = <span class="macro">format!</span>(<span class="string">"{}"</span>, e);
-                <span class="prelude-val">Err</span>(Tperrors::Generic(formatted_error))
+                <span class="kw">let </span>dots = formatted_error.find(<span class="string">":"</span>).unwrap_or_default();
+                <span class="kw">if </span>formatted_error.contains(<span class="string">"SYNTAX"</span>) {
+                    <span class="kw">let </span>formatted_error = formatted_error[dots + <span class="number">1</span>..].trim().to_string();
+                    <span class="prelude-val">Err</span>(Tperrors::Syntax(formatted_error))
+                } <span class="kw">else if </span>formatted_error.contains(<span class="string">"COLUMN"</span>) {
+                    <span class="kw">let </span>formatted_error = formatted_error[dots + <span class="number">1</span>..].trim().to_string();
+                    <span class="prelude-val">Err</span>(Tperrors::Table(formatted_error))
+                } <span class="kw">else </span>{
+                    <span class="kw">let </span>formatted_error = formatted_error[dots + <span class="number">1</span>..].trim().to_string();
+                    <span class="prelude-val">Err</span>(Tperrors::Generic(formatted_error))
+                }
             }
         }
     }

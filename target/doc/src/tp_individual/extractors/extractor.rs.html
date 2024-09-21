@@ -519,7 +519,34 @@
 <a href="#519" id="519">519</a>
 <a href="#520" id="520">520</a>
 <a href="#521" id="521">521</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::errors::tperrors::Tperrors;
+<a href="#522" id="522">522</a>
+<a href="#523" id="523">523</a>
+<a href="#524" id="524">524</a>
+<a href="#525" id="525">525</a>
+<a href="#526" id="526">526</a>
+<a href="#527" id="527">527</a>
+<a href="#528" id="528">528</a>
+<a href="#529" id="529">529</a>
+<a href="#530" id="530">530</a>
+<a href="#531" id="531">531</a>
+<a href="#532" id="532">532</a>
+<a href="#533" id="533">533</a>
+<a href="#534" id="534">534</a>
+<a href="#535" id="535">535</a>
+<a href="#536" id="536">536</a>
+<a href="#537" id="537">537</a>
+<a href="#538" id="538">538</a>
+<a href="#539" id="539">539</a>
+<a href="#540" id="540">540</a>
+<a href="#541" id="541">541</a>
+<a href="#542" id="542">542</a>
+<a href="#543" id="543">543</a>
+<a href="#544" id="544">544</a>
+<a href="#545" id="545">545</a>
+<a href="#546" id="546">546</a>
+<a href="#547" id="547">547</a>
+<a href="#548" id="548">548</a>
+</pre></div><pre class="rust"><code><span class="kw">use crate</span>::{errors::tperrors::Tperrors, sorter::sort::SortMethod};
 
 <span class="kw">use </span><span class="kw">super</span>::sqlcommand::SQLCommand;
 
@@ -811,7 +838,7 @@
     ///
     /// True means its gonna be ASC, False means its gonna be DESC
     ///
-    </span><span class="kw">pub fn </span>parser_orderby_from_str_to_vec(<span class="kw-2">&amp;</span><span class="self">self</span>, str_orderby: <span class="kw-2">&amp;</span>str) -&gt; Vec&lt;(String, bool)&gt; {
+    </span><span class="kw">pub fn </span>parser_orderby_from_str_to_vec(<span class="kw-2">&amp;</span><span class="self">self</span>, str_orderby: <span class="kw-2">&amp;</span>str) -&gt; Vec&lt;SortMethod&gt; {
         str_orderby
             .split(<span class="string">','</span>)
             .map(|part| {
@@ -820,7 +847,10 @@
                 <span class="comment">// Default to ascending order if no direction is specified
                 // clippy witch.
                 </span><span class="kw">let </span>asc = !(parts.len() == <span class="number">2 </span>&amp;&amp; parts[<span class="number">1</span>].eq(<span class="string">"DESC"</span>));
-                (column, asc)
+                SortMethod {
+                    by_column: column,
+                    ascending: asc,
+                }
             })
             .collect()
     }
@@ -919,11 +949,35 @@
             <span class="string">"SELECT * FROM users ORDER BY id DESC, Nombre ASC;"</span>,
         ];
 
-        <span class="kw">let </span>expected: Vec&lt;Vec&lt;(String, bool)&gt;&gt; = <span class="macro">vec!</span>[
-            <span class="macro">vec!</span>[(<span class="string">"id"</span>.to_string(), <span class="bool-val">true</span>)],
-            <span class="macro">vec!</span>[(<span class="string">"id"</span>.to_string(), <span class="bool-val">false</span>)],
-            <span class="macro">vec!</span>[(<span class="string">"id"</span>.to_string(), <span class="bool-val">false</span>), (<span class="string">"Nombre"</span>.to_string(), <span class="bool-val">true</span>)],
-            <span class="macro">vec!</span>[(<span class="string">"id"</span>.to_string(), <span class="bool-val">true</span>), (<span class="string">"Nombre"</span>.to_string(), <span class="bool-val">false</span>)],
+        <span class="kw">let </span>expected: Vec&lt;Vec&lt;SortMethod&gt;&gt; = <span class="macro">vec!</span>[
+            <span class="macro">vec!</span>[SortMethod {
+                by_column: <span class="string">"id"</span>.to_string(),
+                ascending: <span class="bool-val">true</span>,
+            }],
+            <span class="macro">vec!</span>[SortMethod {
+                by_column: <span class="string">"id"</span>.to_string(),
+                ascending: <span class="bool-val">false</span>,
+            }],
+            <span class="macro">vec!</span>[
+                SortMethod {
+                    by_column: <span class="string">"id"</span>.to_string(),
+                    ascending: <span class="bool-val">false</span>,
+                },
+                SortMethod {
+                    by_column: <span class="string">"Nombre"</span>.to_string(),
+                    ascending: <span class="bool-val">true</span>,
+                },
+            ],
+            <span class="macro">vec!</span>[
+                SortMethod {
+                    by_column: <span class="string">"id"</span>.to_string(),
+                    ascending: <span class="bool-val">true</span>,
+                },
+                SortMethod {
+                    by_column: <span class="string">"Nombre"</span>.to_string(),
+                    ascending: <span class="bool-val">false</span>,
+                },
+            ],
         ];
 
         <span class="kw">for </span>(i, q) <span class="kw">in </span>vec_query.iter().enumerate() {
