@@ -1,4 +1,4 @@
-use crate::errors::tperrors::Tperrors;
+use crate::{errors::tperrors::Tperrors, sorter::sort::SortMethod};
 
 use super::sqlcommand::SQLCommand;
 
@@ -290,7 +290,7 @@ impl Extractor {
     ///
     /// True means its gonna be ASC, False means its gonna be DESC
     ///
-    pub fn parser_orderby_from_str_to_vec(&self, str_orderby: &str) -> Vec<(String, bool)> {
+    pub fn parser_orderby_from_str_to_vec(&self, str_orderby: &str) -> Vec<SortMethod> {
         str_orderby
             .split(',')
             .map(|part| {
@@ -299,7 +299,10 @@ impl Extractor {
                 // Default to ascending order if no direction is specified
                 // clippy witch.
                 let asc = !(parts.len() == 2 && parts[1].eq("DESC"));
-                (column, asc)
+                SortMethod {
+                    by_column: column,
+                    ascending: asc,
+                }
             })
             .collect()
     }
@@ -398,11 +401,35 @@ mod tests {
             "SELECT * FROM users ORDER BY id DESC, Nombre ASC;",
         ];
 
-        let expected: Vec<Vec<(String, bool)>> = vec![
-            vec![("id".to_string(), true)],
-            vec![("id".to_string(), false)],
-            vec![("id".to_string(), false), ("Nombre".to_string(), true)],
-            vec![("id".to_string(), true), ("Nombre".to_string(), false)],
+        let expected: Vec<Vec<SortMethod>> = vec![
+            vec![SortMethod {
+                by_column: "id".to_string(),
+                ascending: true,
+            }],
+            vec![SortMethod {
+                by_column: "id".to_string(),
+                ascending: false,
+            }],
+            vec![
+                SortMethod {
+                    by_column: "id".to_string(),
+                    ascending: false,
+                },
+                SortMethod {
+                    by_column: "Nombre".to_string(),
+                    ascending: true,
+                },
+            ],
+            vec![
+                SortMethod {
+                    by_column: "id".to_string(),
+                    ascending: true,
+                },
+                SortMethod {
+                    by_column: "Nombre".to_string(),
+                    ascending: false,
+                },
+            ],
         ];
 
         for (i, q) in vec_query.iter().enumerate() {
