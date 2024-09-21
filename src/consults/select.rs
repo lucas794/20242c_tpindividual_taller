@@ -1,5 +1,6 @@
 use crate::errors::tperrors::*;
 use crate::handler_tables::table::*;
+use crate::sorter::sort::SortMethod;
 
 pub struct Select;
 
@@ -40,7 +41,7 @@ impl Select {
         table: &mut Table,
         columns: Vec<String>,
         conditions: Option<&str>,
-        sorting_method: Option<Vec<(String, bool)>>,
+        sorting_method: Option<Vec<SortMethod>>,
     ) -> Result<(), Tperrors> {
         let csv_data = table.resolve_select(columns, conditions, sorting_method);
 
@@ -54,7 +55,17 @@ impl Select {
             }
             Err(e) => {
                 let formatted_error = format!("{}", e);
-                Err(Tperrors::Generic(formatted_error))
+                let dots = formatted_error.find(":").unwrap_or_default();
+                if formatted_error.contains("SYNTAX") {
+                    let formatted_error = formatted_error[dots + 1..].trim().to_string();
+                    Err(Tperrors::Syntax(formatted_error))
+                } else if formatted_error.contains("COLUMN") {
+                    let formatted_error = formatted_error[dots + 1..].trim().to_string();
+                    Err(Tperrors::Table(formatted_error))
+                } else {
+                    let formatted_error = formatted_error[dots + 1..].trim().to_string();
+                    Err(Tperrors::Generic(formatted_error))
+                }
             }
         }
     }

@@ -53,9 +53,20 @@ impl Delete {
 
                 Ok(())
             }
-            Err(_) => Err(Tperrors::Syntax(
-                "Invalid columns inside the query".to_string(),
-            )),
+            Err(e) => {
+                let formatted_error = format!("{}", e);
+                let dots = formatted_error.find(":").unwrap_or_default();
+                if formatted_error.contains("SYNTAX") {
+                    let formatted_error = formatted_error[dots + 1..].trim().to_string();
+                    Err(Tperrors::Syntax(formatted_error))
+                } else if formatted_error.contains("COLUMN") {
+                    let formatted_error = formatted_error[dots + 1..].trim().to_string();
+                    Err(Tperrors::Table(formatted_error))
+                } else {
+                    let formatted_error = formatted_error[dots + 1..].trim().to_string();
+                    Err(Tperrors::Generic(formatted_error))
+                }
+            }
         }
     }
 }
