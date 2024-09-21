@@ -5,7 +5,10 @@ use std::{
     io::{BufRead, BufReader, BufWriter, Seek, SeekFrom, Write},
 };
 
-use crate::conditions::{condition::Condition, value::Value};
+use crate::{
+    conditions::{condition::Condition, value::Value},
+    sorter::sort::SortMethod,
+};
 
 use crate::errors::fileerrors::*;
 use crate::errors::tperrors::*;
@@ -79,11 +82,12 @@ impl Table {
     /// ```SELECT Nombre FROM table WHERE Apellido = 'Doe' ORDER BY Nombre ASC;```
     ///
     /// The result will be a vector of vector of string (The content readed from the csv)
+
     pub fn resolve_select(
         &mut self,
         columns: Vec<String>,
         opt_conditions_as_str: Option<&str>,
-        vector_sorting: Option<Vec<(String, bool)>>,
+        vector_sorting: Option<Vec<SortMethod>>,
     ) -> Result<Vec<Vec<String>>, std::io::Error> {
         // we need to match the index of the columns with the index of the csv
         // we need to read the csv and get the columns
@@ -150,11 +154,9 @@ impl Table {
                     Ok(false) => {
                         // we do nothing
                     }
-                    Err(_) => {
-                        return Err(std::io::Error::new(
-                            std::io::ErrorKind::Other,
-                            "Error checking conditions".to_string(),
-                        ));
+                    Err(e) => {
+                        let e = e.to_string();
+                        return Err(std::io::Error::new(std::io::ErrorKind::Other, e));
                     }
                 }
             } else {
@@ -171,7 +173,10 @@ impl Table {
         // lets sort the vector if we have a sorting method..
         if let Some(sorting) = vector_sorting {
             // first, let check if the columns are valid
-            let columns_from_query = sorting.iter().map(|(c, _)| c).collect::<Vec<&String>>();
+            let columns_from_query = sorting
+                .iter()
+                .map(|method| method.get_by_column())
+                .collect::<Vec<&String>>();
             if !columns_from_query.iter().all(|c| columns.contains(c)) {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::Other,
@@ -181,21 +186,24 @@ impl Table {
 
             // now sorting the vector
             result.sort_by(|a, b| {
-                for (column, asc) in &sorting {
+                for method in &sorting {
+                    let column = method.get_by_column();
+                    let asc = method.is_ascending();
+
                     let index = columns.iter().position(|c| c == column).unwrap();
                     let a_value = a[index].as_str();
                     let b_value = b[index].as_str();
 
                     match a_value.cmp(b_value) {
                         Ordering::Less => {
-                            if *asc {
+                            if asc {
                                 return Ordering::Less;
                             } else {
                                 return Ordering::Greater;
                             }
                         }
                         Ordering::Greater => {
-                            if *asc {
+                            if asc {
                                 return Ordering::Greater;
                             } else {
                                 return Ordering::Less;
@@ -604,7 +612,10 @@ mod tests {
 
         let conditions: Option<&str> = None;
 
-        let sorting = Some(vec![("Profesion".to_string(), true)]);
+        let sorting = Some(vec![SortMethod {
+            by_column: "Profesion".to_string(),
+            ascending: true,
+        }]);
 
         // at t his point, we have this consult.
         // SELECT Nombre, Edad FROM test ORDER BY Profesion;
