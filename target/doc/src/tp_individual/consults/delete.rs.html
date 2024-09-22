@@ -129,13 +129,13 @@
                 <span class="kw">let </span>formatted_error = <span class="macro">format!</span>(<span class="string">"{}"</span>, e);
                 <span class="kw">let </span>dots = formatted_error.find(<span class="string">":"</span>).unwrap_or_default();
                 <span class="kw">if </span>formatted_error.contains(<span class="string">"SYNTAX"</span>) {
-                    <span class="kw">let </span>formatted_error = formatted_error[dots + <span class="number">1</span>..].trim().to_string();
+                    <span class="kw">let </span>formatted_error = formatted_error[dots..].trim().to_string();
                     <span class="prelude-val">Err</span>(Tperrors::Syntax(formatted_error))
                 } <span class="kw">else if </span>formatted_error.contains(<span class="string">"COLUMN"</span>) {
-                    <span class="kw">let </span>formatted_error = formatted_error[dots + <span class="number">1</span>..].trim().to_string();
+                    <span class="kw">let </span>formatted_error = formatted_error[dots..].trim().to_string();
                     <span class="prelude-val">Err</span>(Tperrors::Table(formatted_error))
                 } <span class="kw">else </span>{
-                    <span class="kw">let </span>formatted_error = formatted_error[dots + <span class="number">1</span>..].trim().to_string();
+                    <span class="kw">let </span>formatted_error = formatted_error[dots..].trim().to_string();
                     <span class="prelude-val">Err</span>(Tperrors::Generic(formatted_error))
                 }
             }

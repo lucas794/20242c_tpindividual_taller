@@ -545,7 +545,6 @@
 <a href="#545" id="545">545</a>
 <a href="#546" id="546">546</a>
 <a href="#547" id="547">547</a>
-<a href="#548" id="548">548</a>
 </pre></div><pre class="rust"><code><span class="kw">use crate</span>::{errors::tperrors::Tperrors, sorter::sort::SortMethod};
 
 <span class="kw">use </span><span class="kw">super</span>::sqlcommand::SQLCommand;
@@ -582,9 +581,8 @@
                 <span class="kw">let </span>iterator_columns = column_data.split(<span class="string">","</span>).collect::&lt;Vec&lt;<span class="kw-2">&amp;</span>str&gt;&gt;();
 
                 iterator_columns.into_iter().for_each(|c| {
-                    columns.push(c.trim().to_string());
+                    columns.push(c.trim().trim_matches(<span class="string">'\''</span>).trim_matches(<span class="string">'\"'</span>).to_string())
                 });
-
                 <span class="prelude-val">Ok</span>(columns)
             }
             <span class="prelude-val">None </span>=&gt; <span class="prelude-val">Err</span>(Tperrors::Syntax(
@@ -628,7 +626,7 @@
         <span class="comment">// Parse the columns and values into vectors
         </span><span class="kw">let </span>columns: Vec&lt;String&gt; = columns_str
             .split(<span class="string">','</span>)
-            .map(|s| s.trim_matches(<span class="string">'\''</span>).trim().to_string())
+            .map(|s| s.trim().trim_matches(<span class="string">'\''</span>).trim_matches(<span class="string">'\"'</span>).to_string())
             .collect();
 
         <span class="kw">let </span>values: Vec&lt;String&gt; = values_str
@@ -638,7 +636,7 @@
                 <span class="kw">if </span>trimmed.is_empty() {
                     <span class="string">""</span>.to_string()
                 } <span class="kw">else </span>{
-                    trimmed.trim_matches(<span class="string">'\''</span>).trim().to_string()
+                    trimmed.trim().trim_matches(<span class="string">'\''</span>).trim_matches(<span class="string">'\"'</span>).to_string()
                 }
             })
             .collect();
@@ -698,8 +696,8 @@
                 ));
             }
 
-            <span class="kw">let </span>column = what_to_update[<span class="number">0</span>].trim().to_string();
-            <span class="kw">let </span>value = what_to_update[<span class="number">1</span>].trim().trim_matches(<span class="string">'\''</span>).to_string();
+            <span class="kw">let </span>column = what_to_update[<span class="number">0</span>].trim().trim_matches(<span class="string">'\''</span>).trim_matches(<span class="string">'\"'</span>).to_string();
+            <span class="kw">let </span>value = what_to_update[<span class="number">1</span>].trim().trim_matches(<span class="string">'\''</span>).trim_matches(<span class="string">'\"'</span>).to_string();
 
             columns.push(column);
             values.push(value);
