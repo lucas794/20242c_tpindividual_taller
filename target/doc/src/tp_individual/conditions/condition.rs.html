@@ -337,7 +337,6 @@
 <a href="#337" id="337">337</a>
 <a href="#338" id="338">338</a>
 <a href="#339" id="339">339</a>
-<a href="#340" id="340">340</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::errors::tperrors::Tperrors;
 
 <span class="kw">use </span><span class="kw">super</span>::value::Value;
@@ -367,8 +366,7 @@
 
     <span class="comment">// Evaluate expressions, handling parentheses and operators recursively
     </span><span class="kw">fn </span>evaluate_expression(<span class="kw-2">&amp;</span><span class="self">self</span>, tokens: <span class="kw-2">&amp;</span>[String], i: <span class="kw-2">&amp;mut </span>usize) -&gt; <span class="prelude-ty">Result</span>&lt;bool, Tperrors&gt; {
-        <span class="comment">//let result_stack: Vec&lt;bool&gt; = vec![];
-        </span><span class="kw">let </span><span class="kw-2">mut </span>operator_stack: Vec&lt;String&gt; = <span class="macro">vec!</span>[];
+        <span class="kw">let </span><span class="kw-2">mut </span>operator_stack: Vec&lt;String&gt; = <span class="macro">vec!</span>[];
         <span class="kw">let </span><span class="kw-2">mut </span>result = <span class="bool-val">true</span>;
         <span class="kw">let </span><span class="kw-2">mut </span>negate_next = <span class="bool-val">false</span>;
 
@@ -376,7 +374,7 @@
             <span class="kw">let </span>token = <span class="kw-2">&amp;</span>tokens[<span class="kw-2">*</span>i];
             <span class="kw">match </span>token.as_str() {
                 <span class="string">"NOT" </span>=&gt; {
-                    negate_next = <span class="bool-val">true</span>; <span class="comment">// Apply negation to the next condition or group
+                    negate_next = <span class="bool-val">true</span>; <span class="comment">// Apply negation
                     </span><span class="kw-2">*</span>i += <span class="number">1</span>;
                 }
                 <span class="string">"(" </span>=&gt; {
@@ -407,11 +405,11 @@
     }
 
     <span class="comment">// Combine two boolean results with the current operator (AND/OR)
-    </span><span class="kw">fn </span>combine_with_operator(<span class="kw-2">&amp;</span><span class="self">self</span>, lhs: bool, rhs: bool, operator: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>String&gt;) -&gt; bool {
+    </span><span class="kw">fn </span>combine_with_operator(<span class="kw-2">&amp;</span><span class="self">self</span>, left: bool, right: bool, operator: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>String&gt;) -&gt; bool {
         <span class="kw">match </span>operator.map(String::as_str) {
-            <span class="prelude-val">Some</span>(<span class="string">"AND"</span>) =&gt; lhs &amp;&amp; rhs,
-            <span class="prelude-val">Some</span>(<span class="string">"OR"</span>) =&gt; lhs || rhs,
-            <span class="kw">_ </span>=&gt; rhs, <span class="comment">// Default to rhs if no operator is provided (like at start)
+            <span class="prelude-val">Some</span>(<span class="string">"AND"</span>) =&gt; left &amp;&amp; right,
+            <span class="prelude-val">Some</span>(<span class="string">"OR"</span>) =&gt; left || right,
+            <span class="kw">_ </span>=&gt; right, <span class="comment">// Default to right if no operator is provided (like at start)
         </span>}
     }
 
