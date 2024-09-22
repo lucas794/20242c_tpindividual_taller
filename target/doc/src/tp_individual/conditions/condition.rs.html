@@ -338,37 +338,6 @@
 <a href="#338" id="338">338</a>
 <a href="#339" id="339">339</a>
 <a href="#340" id="340">340</a>
-<a href="#341" id="341">341</a>
-<a href="#342" id="342">342</a>
-<a href="#343" id="343">343</a>
-<a href="#344" id="344">344</a>
-<a href="#345" id="345">345</a>
-<a href="#346" id="346">346</a>
-<a href="#347" id="347">347</a>
-<a href="#348" id="348">348</a>
-<a href="#349" id="349">349</a>
-<a href="#350" id="350">350</a>
-<a href="#351" id="351">351</a>
-<a href="#352" id="352">352</a>
-<a href="#353" id="353">353</a>
-<a href="#354" id="354">354</a>
-<a href="#355" id="355">355</a>
-<a href="#356" id="356">356</a>
-<a href="#357" id="357">357</a>
-<a href="#358" id="358">358</a>
-<a href="#359" id="359">359</a>
-<a href="#360" id="360">360</a>
-<a href="#361" id="361">361</a>
-<a href="#362" id="362">362</a>
-<a href="#363" id="363">363</a>
-<a href="#364" id="364">364</a>
-<a href="#365" id="365">365</a>
-<a href="#366" id="366">366</a>
-<a href="#367" id="367">367</a>
-<a href="#368" id="368">368</a>
-<a href="#369" id="369">369</a>
-<a href="#370" id="370">370</a>
-<a href="#371" id="371">371</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::errors::tperrors::Tperrors;
 
 <span class="kw">use </span><span class="kw">super</span>::value::Value;
@@ -391,119 +360,88 @@
     /// a query with ```"Name = 'John'"``` will return true
     ///
     </span><span class="kw">pub fn </span>matches_condition(<span class="kw-2">&amp;</span><span class="self">self</span>, conditions: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;bool, Tperrors&gt; {
-        <span class="kw">let </span>splitted_conditions = <span class="self">self</span>.preprocess_conditions(conditions);
-
-        <span class="kw">if </span>splitted_conditions.len() &lt;= <span class="number">1 </span>{
-            <span class="kw">return </span><span class="prelude-val">Err</span>(Tperrors::Syntax(
-                <span class="string">"Condition should be separated. Example: Name = 'John'"</span>.to_string(),
-            ));
-        }
-
+        <span class="kw">let </span>tokens = <span class="self">self</span>.preprocess_conditions(conditions);
         <span class="kw">let </span><span class="kw-2">mut </span>i = <span class="number">0</span>;
-        <span class="kw">let </span><span class="kw-2">mut </span>result_stack: Vec&lt;bool&gt; = <span class="macro">vec!</span>[];
-        <span class="kw">let </span><span class="kw-2">mut </span>operator_stack: Vec&lt;String&gt; = <span class="macro">vec!</span>[];
-        <span class="kw">let </span><span class="kw-2">mut </span>result = <span class="bool-val">true</span>;
-        <span class="kw">let </span><span class="kw-2">mut </span>is_negated = <span class="bool-val">false</span>;
+        <span class="self">self</span>.evaluate_expression(<span class="kw-2">&amp;</span>tokens, <span class="kw-2">&amp;mut </span>i)
+    }
 
-        <span class="kw">while </span>i &lt; splitted_conditions.len() {
-            <span class="kw">let </span>token = <span class="kw-2">&amp;</span>splitted_conditions[i];
+    <span class="comment">// Evaluate expressions, handling parentheses and operators recursively
+    </span><span class="kw">fn </span>evaluate_expression(<span class="kw-2">&amp;</span><span class="self">self</span>, tokens: <span class="kw-2">&amp;</span>[String], i: <span class="kw-2">&amp;mut </span>usize) -&gt; <span class="prelude-ty">Result</span>&lt;bool, Tperrors&gt; {
+        <span class="comment">//let result_stack: Vec&lt;bool&gt; = vec![];
+        </span><span class="kw">let </span><span class="kw-2">mut </span>operator_stack: Vec&lt;String&gt; = <span class="macro">vec!</span>[];
+        <span class="kw">let </span><span class="kw-2">mut </span>result = <span class="bool-val">true</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>negate_next = <span class="bool-val">false</span>;
+
+        <span class="kw">while </span><span class="kw-2">*</span>i &lt; tokens.len() {
+            <span class="kw">let </span>token = <span class="kw-2">&amp;</span>tokens[<span class="kw-2">*</span>i];
             <span class="kw">match </span>token.as_str() {
                 <span class="string">"NOT" </span>=&gt; {
-                    is_negated = <span class="bool-val">true</span>; <span class="comment">// Set negation flag
-                    </span>i += <span class="number">1</span>; <span class="comment">// Move to next token, which should be the condition to negate
-                </span>}
+                    negate_next = <span class="bool-val">true</span>; <span class="comment">// Apply negation to the next condition or group
+                    </span><span class="kw-2">*</span>i += <span class="number">1</span>;
+                }
                 <span class="string">"(" </span>=&gt; {
-                    result_stack.push(result);
-                    operator_stack.push(<span class="string">"("</span>.to_string());
-                    result = <span class="bool-val">true</span>; <span class="comment">// Reset result for the expression inside parentheses
-                    </span>i += <span class="number">1</span>;
+                    <span class="kw-2">*</span>i += <span class="number">1</span>; <span class="comment">// Skip '('
+                    </span><span class="kw">let </span>sub_result = <span class="self">self</span>.evaluate_expression(tokens, i)<span class="question-mark">?</span>;
+                    <span class="kw">let </span>final_result = <span class="kw">if </span>negate_next { !sub_result } <span class="kw">else </span>{ sub_result };
+                    result =
+                        <span class="self">self</span>.combine_with_operator(result, final_result, operator_stack.last());
+                    negate_next = <span class="bool-val">false</span>;
                 }
                 <span class="string">")" </span>=&gt; {
-                    <span class="kw">while let </span><span class="prelude-val">Some</span>(op) = operator_stack.pop() {
-                        <span class="kw">if </span>op == <span class="string">"(" </span>{
-                            <span class="kw">break</span>; <span class="comment">// Exit when matching parenthesis is found
-                        </span>}
-                        <span class="kw">let </span>previous_result = result_stack
-                            .pop()
-                            .ok_or(Tperrors::Syntax(<span class="string">"Mismatched parentheses"</span>.to_string()))<span class="question-mark">?</span>;
-                        result = <span class="self">self</span>.combine_with_operator(previous_result, result, <span class="kw-2">&amp;</span>op);
-                    }
-                    i += <span class="number">1</span>;
+                    <span class="kw-2">*</span>i += <span class="number">1</span>; <span class="comment">// Skip ')'
+                    </span><span class="kw">return </span><span class="prelude-val">Ok</span>(result);
                 }
                 <span class="string">"AND" </span>| <span class="string">"OR" </span>=&gt; {
-                    <span class="kw">let </span>operator = token.to_string();
-                    i += <span class="number">1</span>; <span class="comment">// Move to the next condition after AND/OR
-                    </span><span class="kw">let </span>new_result =
-                        <span class="self">self</span>.evaluate_condition(<span class="kw-2">&amp;</span>splitted_conditions, <span class="kw-2">&amp;mut </span>i, is_negated)<span class="question-mark">?</span>;
-
-                    <span class="comment">// Combine current result with new result
-                    </span>result = <span class="self">self</span>.combine_with_operator(result, new_result, <span class="kw-2">&amp;</span>operator);
-
-                    is_negated = <span class="bool-val">false</span>; <span class="comment">// Reset negation flag after evaluation
-                </span>}
+                    operator_stack.push(token.to_string());
+                    <span class="kw-2">*</span>i += <span class="number">1</span>;
+                }
                 <span class="kw">_ </span>=&gt; {
-                    <span class="comment">// Handle simple condition like "Name = 'John'"
-                    </span>result = <span class="self">self</span>.evaluate_condition(<span class="kw-2">&amp;</span>splitted_conditions, <span class="kw-2">&amp;mut </span>i, is_negated)<span class="question-mark">?</span>;
-                    is_negated = <span class="bool-val">false</span>; <span class="comment">// Reset negation flag after evaluation
-                </span>}
+                    <span class="kw">let </span>condition_result = <span class="self">self</span>.evaluate_condition(tokens, i, negate_next)<span class="question-mark">?</span>;
+                    result =
+                        <span class="self">self</span>.combine_with_operator(result, condition_result, operator_stack.last());
+                    negate_next = <span class="bool-val">false</span>;
+                }
             }
         }
-
-        <span class="comment">// Handle remaining operators
-        </span><span class="kw">while let </span><span class="prelude-val">Some</span>(op) = operator_stack.pop() {
-            <span class="kw">let </span>previous_result = result_stack.pop().ok_or(Tperrors::Syntax(
-                <span class="string">"Mismatched parentheses or missing operators"</span>.to_string(),
-            ))<span class="question-mark">?</span>;
-            result = <span class="self">self</span>.combine_with_operator(previous_result, result, <span class="kw-2">&amp;</span>op);
-        }
-
         <span class="prelude-val">Ok</span>(result)
     }
 
-    <span class="kw">pub fn </span>evaluate_condition(
+    <span class="comment">// Combine two boolean results with the current operator (AND/OR)
+    </span><span class="kw">fn </span>combine_with_operator(<span class="kw-2">&amp;</span><span class="self">self</span>, lhs: bool, rhs: bool, operator: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>String&gt;) -&gt; bool {
+        <span class="kw">match </span>operator.map(String::as_str) {
+            <span class="prelude-val">Some</span>(<span class="string">"AND"</span>) =&gt; lhs &amp;&amp; rhs,
+            <span class="prelude-val">Some</span>(<span class="string">"OR"</span>) =&gt; lhs || rhs,
+            <span class="kw">_ </span>=&gt; rhs, <span class="comment">// Default to rhs if no operator is provided (like at start)
+        </span>}
+    }
+
+    <span class="comment">// Evaluate individual condition
+    </span><span class="kw">fn </span>evaluate_condition(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        conditions: <span class="kw-2">&amp;</span>[String],
+        tokens: <span class="kw-2">&amp;</span>[String],
         i: <span class="kw-2">&amp;mut </span>usize,
         negate: bool,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;bool, Tperrors&gt; {
-        <span class="kw">if </span><span class="kw-2">*</span>i + <span class="number">2 </span>&gt;= conditions.len() {
+        <span class="kw">if </span><span class="kw-2">*</span>i + <span class="number">2 </span>&gt;= tokens.len() {
             <span class="kw">return </span><span class="prelude-val">Err</span>(Tperrors::Syntax(<span class="string">"Condition incomplete"</span>.to_string()));
         }
 
-        <span class="kw">let </span>column = <span class="kw-2">&amp;</span>conditions[<span class="kw-2">*</span>i].trim_matches(<span class="string">'\''</span>).trim_matches(<span class="string">'\"'</span>);
-        <span class="kw">let </span>operator = <span class="kw-2">&amp;</span>conditions[<span class="kw-2">*</span>i + <span class="number">1</span>];
-        <span class="kw">let </span>value = <span class="kw-2">&amp;</span>conditions[<span class="kw-2">*</span>i + <span class="number">2</span>].trim_matches(<span class="string">'\''</span>).trim_matches(<span class="string">'\"'</span>);
-        <span class="kw-2">*</span>i += <span class="number">3</span>; <span class="comment">// Advance the index properly
+        <span class="kw">let </span>column = <span class="kw-2">&amp;</span>tokens[<span class="kw-2">*</span>i].trim_matches(<span class="string">'\''</span>).trim_matches(<span class="string">'\"'</span>);
+        <span class="kw">let </span>operator = <span class="kw-2">&amp;</span>tokens[<span class="kw-2">*</span>i + <span class="number">1</span>];
+        <span class="kw">let </span>value = <span class="kw-2">&amp;</span>tokens[<span class="kw-2">*</span>i + <span class="number">2</span>].trim_matches(<span class="string">'\''</span>).trim_matches(<span class="string">'\"'</span>);
+        <span class="kw-2">*</span>i += <span class="number">3</span>;
 
-        </span><span class="kw">let </span>found_column = <span class="self">self</span>.data.iter().find(|(col, <span class="kw">_</span>)| col == column);
+        <span class="kw">let </span>found_column = <span class="self">self</span>.data.iter().find(|(col, <span class="kw">_</span>)| col == column);
         <span class="kw">if let </span><span class="prelude-val">Some</span>((<span class="kw">_</span>, actual_value)) = found_column {
             <span class="kw">let </span>evaluation_check = <span class="self">self</span>.resolve_evaluation(actual_value, operator, value);
-
-            <span class="comment">// Apply negation if the negate flag is set
-            </span><span class="prelude-val">Ok</span>(<span class="kw">if </span>negate {
+            <span class="prelude-val">Ok</span>(<span class="kw">if </span>negate {
                 !evaluation_check
             } <span class="kw">else </span>{
                 evaluation_check
             })
         } <span class="kw">else </span>{
-            <span class="kw">if </span><span class="kw-2">*</span>column == <span class="string">"NOT" </span>{
-                <span class="kw-2">*</span>i -= <span class="number">3</span>;
-                <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="kw">match </span>negate {
-                    <span class="bool-val">true </span>=&gt; <span class="bool-val">false</span>,
-                    <span class="bool-val">false </span>=&gt; <span class="bool-val">true</span>,
-                });
-            }
             <span class="prelude-val">Err</span>(Tperrors::Generic(<span class="macro">format!</span>(<span class="string">"Error with column {}"</span>, column)))
         }
-    }
-
-    <span class="comment">// Combine results with an operator (AND/OR)
-    </span><span class="kw">fn </span>combine_with_operator(<span class="kw-2">&amp;</span><span class="self">self</span>, lhs: bool, rhs: bool, operator: <span class="kw-2">&amp;</span>str) -&gt; bool {
-        <span class="kw">match </span>operator {
-            <span class="string">"AND" </span>=&gt; lhs &amp;&amp; rhs,
-            <span class="string">"OR" </span>=&gt; lhs || rhs,
-            <span class="kw">_ </span>=&gt; rhs, <span class="comment">// Default to rhs if no operator is specified
-        </span>}
     }
 
     <span class="comment">// Preprocess conditions to properly split parentheses from other tokens

@@ -844,6 +844,20 @@
 <a href="#844" id="844">844</a>
 <a href="#845" id="845">845</a>
 <a href="#846" id="846">846</a>
+<a href="#847" id="847">847</a>
+<a href="#848" id="848">848</a>
+<a href="#849" id="849">849</a>
+<a href="#850" id="850">850</a>
+<a href="#851" id="851">851</a>
+<a href="#852" id="852">852</a>
+<a href="#853" id="853">853</a>
+<a href="#854" id="854">854</a>
+<a href="#855" id="855">855</a>
+<a href="#856" id="856">856</a>
+<a href="#857" id="857">857</a>
+<a href="#858" id="858">858</a>
+<a href="#859" id="859">859</a>
+<a href="#860" id="860">860</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{
     cmp::Ordering,
     collections::HashMap,
@@ -944,8 +958,7 @@
         // but it may be the joker (*) so we need to handle it
         </span><span class="kw">let </span>index_requested_columns = <span class="kw">if </span>columns.len() == <span class="number">1 </span>&amp;&amp; columns[<span class="number">0</span>] == <span class="string">"*" </span>{
             (<span class="number">0</span>..columns_from_file.len()).collect::&lt;Vec&lt;usize&gt;&gt;()
-        }
-        <span class="kw">else </span>{
+        } <span class="kw">else </span>{
             columns
                 .iter()
                 .map(|c| {
@@ -971,9 +984,11 @@
 
             <span class="kw">if </span>opt_conditions_as_str.is_some() {
                 <span class="comment">// we have conditions to check
-                </span><span class="kw">let </span>(extracted_conditions, line_to_writte) =
-                    <span class="self">self</span>.extract_conditions(<span class="kw-2">&amp;</span>(<span class="number">0</span>..columns_from_file.len()).collect::&lt;Vec&lt;usize&gt;&gt;(),
-                    <span class="kw-2">&amp;</span>splitted_line, <span class="kw-2">&amp;</span>columns_from_file);
+                </span><span class="kw">let </span>(extracted_conditions, line_to_writte) = <span class="self">self</span>.extract_conditions(
+                    <span class="kw-2">&amp;</span>(<span class="number">0</span>..columns_from_file.len()).collect::&lt;Vec&lt;usize&gt;&gt;(),
+                    <span class="kw-2">&amp;</span>splitted_line,
+                    <span class="kw-2">&amp;</span>columns_from_file,
+                );
 
                 <span class="comment">// we cut line_to_writte to keep only the index we requested
                 </span><span class="kw">let </span>line_to_writte = index_requested_columns
@@ -1654,10 +1669,7 @@
 
         <span class="comment">// execute_Selects do a print, so we need to hook it
 
-        </span><span class="kw">let </span>expected_result = <span class="macro">vec!</span>[
-            <span class="macro">vec!</span>[<span class="string">"Nombre"</span>.to_string()],
-            <span class="macro">vec!</span>[<span class="string">"Carlos"</span>.to_string()],
-        ];
+        </span><span class="kw">let </span>expected_result = <span class="macro">vec!</span>[<span class="macro">vec!</span>[<span class="string">"Nombre"</span>.to_string()], <span class="macro">vec!</span>[<span class="string">"Carlos"</span>.to_string()]];
 
         <span class="kw">let </span>result = table.resolve_select(columns, conditions, sorting).unwrap();
 
@@ -1688,6 +1700,22 @@
         <span class="kw">for </span>(i, line) <span class="kw">in </span>result.iter().enumerate() {
             <span class="macro">assert_eq!</span>(line, <span class="kw-2">&amp;</span>expected_result[i]);
         }
+    }
+    <span class="attr">#[test]
+    </span><span class="kw">fn </span>return_select_returns_ok_with_nested_parenthesis_condition() {
+        <span class="kw">let </span><span class="kw-2">mut </span>table = Table::new(<span class="string">"./tests/test_tables/database.csv"</span>.to_string()).unwrap();
+
+        <span class="kw">let </span>columns = <span class="macro">vec!</span>[<span class="string">"Nombre"</span>.to_string(), <span class="string">"Profesion"</span>.to_string()];
+        <span class="kw">let </span>conditions = <span class="prelude-val">Some</span>(<span class="string">"(Edad &gt;= 32 AND Edad &lt;= 40) AND (Nombre = Juan OR Nombre = Pedro)"</span>);
+        <span class="kw">let </span>result = table.resolve_select(columns, conditions, <span class="prelude-val">None</span>).unwrap();
+
+        <span class="kw">let </span>expected_result = <span class="macro">vec!</span>[
+            <span class="macro">vec!</span>[<span class="string">"Nombre"</span>.to_string(), <span class="string">"Profesion"</span>.to_string()],
+            <span class="macro">vec!</span>[<span class="string">"Juan"</span>.to_string(), <span class="string">"medico"</span>.to_string()],
+            <span class="macro">vec!</span>[<span class="string">"Pedro"</span>.to_string(), <span class="string">"diseñador"</span>.to_string()],
+        ];
+
+        <span class="macro">assert_eq!</span>(result, expected_result);
     }
 }
 </code></pre></div></section></main></body></html>
