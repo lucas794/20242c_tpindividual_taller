@@ -61,7 +61,12 @@ mod tests {
     #[test]
     fn test_folder_tables() {
         let folder = FolderTables::new("./tables").unwrap();
-        let path = folder.get_path("default_file");
-        assert_eq!(path, Some("./tables/default_file.csv".to_string()));
+
+        let expected_tables = vec!["clientes", "ordenes"];
+
+        for table in expected_tables {
+            let path = folder.get_path(table);
+            assert_eq!(path, Some(format!("./tables/{}.csv", table)));
+        }
     }
 }
