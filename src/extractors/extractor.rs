@@ -34,9 +34,8 @@ impl Extractor {
                 let iterator_columns = column_data.split(",").collect::<Vec<&str>>();
 
                 iterator_columns.into_iter().for_each(|c| {
-                    columns.push(c.trim().to_string());
+                    columns.push(c.trim().trim_matches('\'').trim_matches('\"').to_string())
                 });
-
                 Ok(columns)
             }
             None => Err(Tperrors::Syntax(
@@ -80,7 +79,7 @@ impl Extractor {
         // Parse the columns and values into vectors
         let columns: Vec<String> = columns_str
             .split(',')
-            .map(|s| s.trim_matches('\'').trim().to_string())
+            .map(|s| s.trim().trim_matches('\'').trim_matches('\"').to_string())
             .collect();
 
         let values: Vec<String> = values_str
@@ -90,7 +89,11 @@ impl Extractor {
                 if trimmed.is_empty() {
                     "".to_string()
                 } else {
-                    trimmed.trim_matches('\'').trim().to_string()
+                    trimmed
+                        .trim()
+                        .trim_matches('\'')
+                        .trim_matches('\"')
+                        .to_string()
                 }
             })
             .collect();
@@ -150,8 +153,16 @@ impl Extractor {
                 ));
             }
 
-            let column = what_to_update[0].trim().to_string();
-            let value = what_to_update[1].trim().trim_matches('\'').to_string();
+            let column = what_to_update[0]
+                .trim()
+                .trim_matches('\'')
+                .trim_matches('\"')
+                .to_string();
+            let value = what_to_update[1]
+                .trim()
+                .trim_matches('\'')
+                .trim_matches('\"')
+                .to_string();
 
             columns.push(column);
             values.push(value);
