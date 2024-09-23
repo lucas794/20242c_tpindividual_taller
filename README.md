@@ -65,15 +65,15 @@ cargo test --test '*'
 
 ## Correcciones realizadas
 
-    - [x] Cambio de lectura de archivos a ruta de carpeta
-    - [x] Cada estructura tiene su propia carpeta creada.
-    - [x] Limpieza de comentarios inecesarios
-    - [x] Refactor [run](https://github.com/lucas794/20242c_tpindividual_taller/blob/ee3c77fc37aa7f4291fd7df8e4af1758ee08b7e7/src/main.rs#L30) en ./src para hacer bloques de código mas cortos
-    - [x] Soporte de paréntesis en condicionales
-    - [x] Error con condiciones pegadas, programa quedaba colgado, ahora se lanza un error correspondiente.
-    - [x] Caso particular con operacion AND a veces fallaba.
-    - [x] Agregado por mi parte (no es parte de la corrección): Se agregó un struct Sorter.
-    - [x] SELECT: Las consultas ahora se devuelven en el orden ingresado de las columnas.
-    - [x] SELECT: Las consultas ahora permiten condicionales que no estén ingresadas en la query (Ejemplo SELECT Edad FROM table WHERE Nombre = 'Luis')
-    - [x] TODAS LAS CONSULTAS: Fix en columnas que tenian nombre espaciado
-    - [x] Test agregados para estas nuevas features mencionadas previamente
+- [x] Cambio de lectura de archivos a ruta de carpeta
+- [x] Cada estructura tiene su propia carpeta creada.
+- [x] Limpieza de comentarios inecesarios
+- [x] Refactor [run](https://github.com/lucas794/20242c_tpindividual_taller/blob/ee3c77fc37aa7f4291fd7df8e4af1758ee08b7e7/src/main.rs#L30) en ./src para hacer bloques de código mas cortos
+- [x] Soporte de paréntesis en condicionales
+- [x] Error con condiciones pegadas, programa quedaba colgado, ahora se lanza un error correspondiente.
+- [x] Caso particular con operacion AND a veces fallaba.
+- [x] Agregado por mi parte (no es parte de la corrección): Se agregó un struct Sorter.
+- [x] SELECT: Las consultas ahora se devuelven en el orden ingresado de las columnas.
+- [x] SELECT: Las consultas ahora permiten condicionales que no estén ingresadas en la query (Ejemplo SELECT Edad FROM table WHERE Nombre = 'Luis')
+- [x] TODAS LAS CONSULTAS: Fix en columnas que tenian nombre espaciado
+- [x] Test agregados para estas nuevas features mencionadas previamente
