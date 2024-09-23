@@ -20,118 +20,89 @@ impl Condition {
     /// a query with ```"Name = 'John'"``` will return true
     ///
     pub fn matches_condition(&self, conditions: &str) -> Result<bool, Tperrors> {
-        let splitted_conditions = self.preprocess_conditions(conditions);
-
-        if splitted_conditions.len() <= 1 {
-            return Err(Tperrors::Syntax(
-                "Condition should be separated. Example: Name = 'John'".to_string(),
-            ));
-        }
-
+        let tokens = self.preprocess_conditions(conditions);
         let mut i = 0;
-        let mut result_stack: Vec<bool> = vec![];
+        self.evaluate_expression(&tokens, &mut i)
+    }
+
+    // Evaluate expressions, handling parentheses and operators recursively
+    fn evaluate_expression(&self, tokens: &[String], i: &mut usize) -> Result<bool, Tperrors> {
         let mut operator_stack: Vec<String> = vec![];
         let mut result = true;
-        let mut is_negated = false;
+        let mut negate_next = false;
 
-        while i < splitted_conditions.len() {
-            let token = &splitted_conditions[i];
+        while *i < tokens.len() {
+            let token = &tokens[*i];
             match token.as_str() {
                 "NOT" => {
-                    is_negated = true; // Set negation flag
-                    i += 1; // Move to next token, which should be the condition to negate
+                    negate_next = true; // Apply negation
+                    *i += 1;
                 }
                 "(" => {
-                    result_stack.push(result);
-                    operator_stack.push("(".to_string());
-                    result = true; // Reset result for the expression inside parentheses
-                    i += 1;
+                    *i += 1; // Skip '('
+                    let sub_result = self.evaluate_expression(tokens, i)?;
+                    let final_result = if negate_next { !sub_result } else { sub_result };
+                    result =
+                        self.combine_with_operator(result, final_result, operator_stack.last());
+                    negate_next = false;
                 }
                 ")" => {
-                    while let Some(op) = operator_stack.pop() {
-                        if op == "(" {
-                            break; // Exit when matching parenthesis is found
-                        }
-                        let previous_result = result_stack
-                            .pop()
-                            .ok_or(Tperrors::Syntax("Mismatched parentheses".to_string()))?;
-                        result = self.combine_with_operator(previous_result, result, &op);
-                    }
-                    i += 1;
+                    *i += 1; // Skip ')'
+                    return Ok(result);
                 }
                 "AND" | "OR" => {
-                    let operator = token.to_string();
-                    i += 1; // Move to the next condition after AND/OR
-                    let new_result =
-                        self.evaluate_condition(&splitted_conditions, &mut i, is_negated)?;
-
-                    // Combine current result with new result
-                    result = self.combine_with_operator(result, new_result, &operator);
-
-                    is_negated = false; // Reset negation flag after evaluation
+                    operator_stack.push(token.to_string());
+                    *i += 1;
                 }
                 _ => {
-                    // Handle simple condition like "Name = 'John'"
-                    result = self.evaluate_condition(&splitted_conditions, &mut i, is_negated)?;
-                    is_negated = false; // Reset negation flag after evaluation
+                    let condition_result = self.evaluate_condition(tokens, i, negate_next)?;
+                    result =
+                        self.combine_with_operator(result, condition_result, operator_stack.last());
+                    negate_next = false;
                 }
             }
         }
-
-        // Handle remaining operators
-        while let Some(op) = operator_stack.pop() {
-            let previous_result = result_stack.pop().ok_or(Tperrors::Syntax(
-                "Mismatched parentheses or missing operators".to_string(),
-            ))?;
-            result = self.combine_with_operator(previous_result, result, &op);
-        }
-
         Ok(result)
     }
 
-    pub fn evaluate_condition(
+    // Combine two boolean results with the current operator (AND/OR)
+    fn combine_with_operator(&self, left: bool, right: bool, operator: Option<&String>) -> bool {
+        match operator.map(String::as_str) {
+            Some("AND") => left && right,
+            Some("OR") => left || right,
+            _ => right, // Default to right if no operator is provided (like at start)
+        }
+    }
+
+    // Evaluate individual condition
+    fn evaluate_condition(
         &self,
-        conditions: &[String],
+        tokens: &[String],
         i: &mut usize,
         negate: bool,
     ) -> Result<bool, Tperrors> {
-        if *i + 2 >= conditions.len() {
+        if *i + 2 >= tokens.len() {
             return Err(Tperrors::Syntax("Condition incomplete".to_string()));
         }
 
-        let column = &conditions[*i].trim_matches('\'').trim_matches('\"');
-        let operator = &conditions[*i + 1];
-        let value = &conditions[*i + 2].trim_matches('\'').trim_matches('\"');
-        *i += 3; // Advance the index properly
+        let column = &tokens[*i].trim_matches('\'').trim_matches('\"');
+        let operator = &tokens[*i + 1];
+        let value = &tokens[*i + 2].trim_matches('\'').trim_matches('\"');
+        *i += 3;
 
         let found_column = self.data.iter().find(|(col, _)| col == column);
         if let Some((_, actual_value)) = found_column {
             let evaluation_check = self.resolve_evaluation(actual_value, operator, value);
-
-            // Apply negation if the negate flag is set
             Ok(if negate {
                 !evaluation_check
             } else {
                 evaluation_check
             })
         } else {
-            if *column == "NOT" {
-                *i -= 3;
-                return Ok(match negate {
-                    true => false,
-                    false => true,
-                });
-            }
-            Err(Tperrors::Generic(format!("Error with column {}", column)))
-        }
-    }
-
-    // Combine results with an operator (AND/OR)
-    fn combine_with_operator(&self, lhs: bool, rhs: bool, operator: &str) -> bool {
-        match operator {
-            "AND" => lhs && rhs,
-            "OR" => lhs || rhs,
-            _ => rhs, // Default to rhs if no operator is specified
+            Err(Tperrors::Generic(format!(
+                "Error with column {}, maybe spaces is required?",
+                column
+            )))
         }
     }
 
