@@ -65,6 +65,11 @@
 <a href="#65" id="65">65</a>
 <a href="#66" id="66">66</a>
 <a href="#67" id="67">67</a>
+<a href="#68" id="68">68</a>
+<a href="#69" id="69">69</a>
+<a href="#70" id="70">70</a>
+<a href="#71" id="71">71</a>
+<a href="#72" id="72">72</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{collections::HashMap, fs, io, rc::Rc};
 
 <span class="doccomment">/// FolderTables is a struct that contains a HashMap
@@ -128,8 +133,13 @@
     <span class="attr">#[test]
     </span><span class="kw">fn </span>test_folder_tables() {
         <span class="kw">let </span>folder = FolderTables::new(<span class="string">"./tables"</span>).unwrap();
-        <span class="kw">let </span>path = folder.get_path(<span class="string">"default_file"</span>);
-        <span class="macro">assert_eq!</span>(path, <span class="prelude-val">Some</span>(<span class="string">"./tables/default_file.csv"</span>.to_string()));
+
+        <span class="kw">let </span>expected_tables = <span class="macro">vec!</span>[<span class="string">"clientes"</span>, <span class="string">"ordenes"</span>];
+
+        <span class="kw">for </span>table <span class="kw">in </span>expected_tables {
+            <span class="kw">let </span>path = folder.get_path(table);
+            <span class="macro">assert_eq!</span>(path, <span class="prelude-val">Some</span>(<span class="macro">format!</span>(<span class="string">"./tables/{}.csv"</span>, table)));
+        }
     }
 }
 </code></pre></div></section></main></body></html>
