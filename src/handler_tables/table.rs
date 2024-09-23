@@ -92,7 +92,131 @@ impl Table {
         // we need to match the index of the columns with the index of the csv
         // we need to read the csv and get the columns
         // we need to print the columns
+        let columns_from_file = self.get_column_from_file()?;
 
+        // we need to get the columns index, if the column isnt found, throw error
+        // but it may be the joker (*) so we need to handle it
+        let index_requested_columns = if columns.len() == 1 && columns[0] == "*" {
+            (0..columns_from_file.len()).collect::<Vec<usize>>()
+        } else {
+            columns
+                .iter()
+                .map(|c| {
+                    columns_from_file
+                        .iter()
+                        .position(|col| col == c)
+                        .ok_or_else(|| {
+                            std::io::Error::new(
+                                std::io::ErrorKind::Other,
+                                format!("Invalid column {} inside the query", c),
+                            )
+                        })
+                })
+                .collect::<Result<Vec<usize>, std::io::Error>>()?
+        };
+
+        self.file.seek(std::io::SeekFrom::Start(0))?; // lets place it after the columns name
+        let mut result: Vec<Vec<String>> = Vec::new();
+
+        for line_read in std::io::BufReader::new(&self.file).lines().skip(1) {
+            let line = line_read?;
+            let splitted_line = line.split(",").collect::<Vec<&str>>();
+
+            if opt_conditions_as_str.is_some() {
+                // we have conditions to check
+                let (extracted_conditions, line_to_writte) = self.extract_conditions(
+                    &(0..columns_from_file.len()).collect::<Vec<usize>>(),
+                    &splitted_line,
+                    &columns_from_file,
+                );
+
+                // we cut line_to_writte to keep only the index we requested
+                let line_to_writte = index_requested_columns
+                    .iter()
+                    .map(|i| line_to_writte[*i].to_string())
+                    .collect::<Vec<String>>();
+                // now everything is clear and ready to check if conditions are met
+                let condition = Condition::new(extracted_conditions);
+                let str_conditions = opt_conditions_as_str.unwrap_or("");
+
+                match condition.matches_condition(str_conditions) {
+                    Ok(true) => {
+                        result.push(line_to_writte);
+                    }
+                    Ok(false) => {
+                        // we do nothing
+                    }
+                    Err(e) => {
+                        let e = e.to_string();
+                        return Err(std::io::Error::new(std::io::ErrorKind::Other, e));
+                    }
+                }
+            } else {
+                // we need to push the matched columns to the vector
+                let line_to_write = index_requested_columns
+                    .iter()
+                    .map(|i| splitted_line[*i])
+                    .map(|s| s.to_string())
+                    .collect::<Vec<String>>();
+                result.push(line_to_write);
+            }
+        }
+
+        if let Some(sorting) = vector_sorting {
+            // first, let check if the columns are valid
+            let columns_from_query = sorting
+                .iter()
+                .map(|method| method.get_by_column())
+                .collect::<Vec<&String>>();
+            if !columns_from_query.iter().all(|c| columns.contains(c)) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "Invalid columns inside the query",
+                ));
+            }
+
+            // now sorting the vector
+            result.sort_by(|a, b| {
+                for method in &sorting {
+                    let column = method.get_by_column();
+                    let asc = method.is_ascending();
+
+                    let index = columns.iter().position(|c| c == column).unwrap();
+                    let a_value = a[index].as_str();
+                    let b_value = b[index].as_str();
+
+                    match a_value.cmp(b_value) {
+                        Ordering::Less => {
+                            if asc {
+                                return Ordering::Less;
+                            } else {
+                                return Ordering::Greater;
+                            }
+                        }
+                        Ordering::Greater => {
+                            if asc {
+                                return Ordering::Greater;
+                            } else {
+                                return Ordering::Less;
+                            }
+                        }
+                        Ordering::Equal => {
+                            continue;
+                        }
+                    }
+                }
+                Ordering::Equal
+            });
+        }
+        // same as line_to_writte, we filter columns_from_file to keep only the requested columns
+        let columns_from_file = index_requested_columns
+            .iter()
+            .map(|i| columns_from_file[*i].to_string())
+            .collect::<Vec<String>>();
+
+        result.insert(0, columns_from_file);
+        Ok(result)
+        /*
         let splitted_columns_from_file = match self.get_column_from_file() {
             Ok(columns) => columns,
             Err(e) => {
@@ -114,7 +238,7 @@ impl Table {
             if columns.len() != temp_index.len() {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::Other,
-                    "Invalid columns",
+                    "Invalid columns inside the query",
                 ));
             }
             temp_index
@@ -143,6 +267,7 @@ impl Table {
                 let (extracted_conditions, line_to_writte) =
                     self.extract_conditions(&index_columns, &splitted_line, &columns);
 
+                println!("EC: {:?}", extracted_conditions);
                 // now everything is clear and ready to check if conditions are met
                 let condition = Condition::new(extracted_conditions);
                 let str_conditions = opt_conditions_as_str.unwrap_or("");
@@ -219,7 +344,7 @@ impl Table {
         }
         result.insert(0, columns); // to prevent clone, at the end the columns at the top of the vector.
 
-        Ok(result)
+        Ok(result)*/
     }
 
     /// given a columns and values as Vec of String
@@ -644,6 +769,90 @@ mod tests {
         let expected_result = vec![
             vec!["Nombre".to_string(), "Edad".to_string()],
             vec!["Luis".to_string(), "29".to_string()],
+        ];
+
+        assert_eq!(result, expected_result);
+    }
+
+    #[test]
+    fn return_select_returns_proper_order_of_requested_columns() {
+        // I'm trying to do a SELECT Edad, Nombre FROM table WHERE Edad = 45;
+        // Edad = 45 only to get one result.
+
+        let mut table = Table::new("./tests/test_tables/database.csv".to_string()).unwrap();
+        let columns = vec!["Edad".to_string(), "Nombre".to_string()];
+        let conditions = Some("Edad = 45");
+        let sorting = None;
+
+        // execute_Selects do a print, so we need to hook it
+
+        let expected_result = vec![
+            vec!["Edad".to_string(), "Nombre".to_string()],
+            vec!["45".to_string(), "Carlos".to_string()],
+        ];
+
+        let result = table.resolve_select(columns, conditions, sorting).unwrap();
+
+        for (i, line) in result.iter().enumerate() {
+            assert_eq!(line, &expected_result[i]);
+        }
+    }
+    #[test]
+    fn return_select_returns_proper_answer_without_passing_the_column_as_query() {
+        // I'm trying to do a SELECT Nombre FROM table WHERE Edad = 45;
+        // So i'm going to get only Carlos as result.
+
+        let mut table = Table::new("./tests/test_tables/database.csv".to_string()).unwrap();
+        let columns = vec!["Nombre".to_string()];
+        let conditions = Some("Edad = 45");
+        let sorting = None;
+
+        // execute_Selects do a print, so we need to hook it
+
+        let expected_result = vec![vec!["Nombre".to_string()], vec!["Carlos".to_string()]];
+
+        let result = table.resolve_select(columns, conditions, sorting).unwrap();
+
+        for (i, line) in result.iter().enumerate() {
+            assert_eq!(line, &expected_result[i]);
+        }
+    }
+
+    #[test]
+    fn return_select_returns_proper_answer_with_column_with_spaces() {
+        // I'm trying to do a SELECT \"Correo electronico\" FROM table WHERE Edad = 45;
+        // So i'm going to get only csanchez@gmail.com as result.
+
+        let mut table = Table::new("./tests/test_tables/database.csv".to_string()).unwrap();
+        let columns = vec!["Correo electronico".to_string()];
+        let conditions = Some("Edad = 45");
+        let sorting = None;
+
+        // execute_Selects do a print, so we need to hook it
+
+        let expected_result = vec![
+            vec!["Correo electronico".to_string()],
+            vec!["csanchez@gmail.com".to_string()],
+        ];
+
+        let result = table.resolve_select(columns, conditions, sorting).unwrap();
+
+        for (i, line) in result.iter().enumerate() {
+            assert_eq!(line, &expected_result[i]);
+        }
+    }
+    #[test]
+    fn return_select_returns_ok_with_nested_parenthesis_condition() {
+        let mut table = Table::new("./tests/test_tables/database.csv".to_string()).unwrap();
+
+        let columns = vec!["Nombre".to_string(), "Profesion".to_string()];
+        let conditions = Some("(Edad >= 32 AND Edad <= 40) AND (Nombre = Juan OR Nombre = Pedro)");
+        let result = table.resolve_select(columns, conditions, None).unwrap();
+
+        let expected_result = vec![
+            vec!["Nombre".to_string(), "Profesion".to_string()],
+            vec!["Juan".to_string(), "medico".to_string()],
+            vec!["Pedro".to_string(), "diseñador".to_string()],
         ];
 
         assert_eq!(result, expected_result);
