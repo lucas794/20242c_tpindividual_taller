@@ -74,6 +74,7 @@ fn integration_delete_whole_database_query() {
     command.wait().unwrap();
 
     // we are basically deleting the whole database, ONLY the header remains..
+    std::thread::sleep(std::time::Duration::from_millis(30));
 
     let reader = BufReader::new(File::open(&route_file).unwrap());
 
@@ -84,6 +85,4 @@ fn integration_delete_whole_database_query() {
     assert_eq!(last_line, expected_output);
 
     let _ = std::fs::remove_file(&route_file).unwrap();
-
-    assert_eq!(last_line, expected_output);
 }

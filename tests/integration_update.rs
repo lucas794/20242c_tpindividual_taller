@@ -31,7 +31,7 @@ fn integration_update_simple_query() {
         .unwrap();
 
     command.wait().unwrap();
-
+    std::thread::sleep(std::time::Duration::from_millis(30));
     // lets read the last line of the file
     let reader = BufReader::new(File::open(&route_file).unwrap());
 

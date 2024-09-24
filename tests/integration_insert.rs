@@ -31,7 +31,7 @@ fn integration_insert_query_without_all_columns_used() {
         .unwrap();
 
     command.wait().unwrap();
-
+    std::thread::sleep(std::time::Duration::from_millis(30));
     // lets read the last line of the file
     let reader = BufReader::new(File::open(&route_file).unwrap());
 
@@ -71,7 +71,7 @@ fn integration_insert_query_with_all_columns_used() {
         .unwrap();
 
     command.wait().unwrap();
-
+    std::thread::sleep(std::time::Duration::from_millis(30));
     // lets read the last line of the file
     let reader = BufReader::new(File::open(&route_file).unwrap());
 

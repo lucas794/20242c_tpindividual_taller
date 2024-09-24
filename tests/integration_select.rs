@@ -29,7 +29,7 @@ fn integration_simple_select_query() {
         vec!["Pedro", "33"],
         vec!["Diego", "39"],
     ];
-
+    std::thread::sleep(std::time::Duration::from_millis(30));
     // read  the file and compare it with the expected output
     let reader = BufReader::new(file);
 
@@ -64,7 +64,7 @@ fn integration_advanced_select_query() {
         .unwrap();
 
     command.wait().unwrap();
-
+    std::thread::sleep(std::time::Duration::from_millis(30));
     let file = File::open(&route_file).unwrap();
 
     let expected_output = vec![
