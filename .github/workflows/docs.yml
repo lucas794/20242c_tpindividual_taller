@@ -37,6 +37,9 @@ jobs:
 
       - name: Build docs
         run: cargo doc --no-deps
+      
+      - name: Generate llvm coverage 
+        run : cargo llvm-cov --output-dir target/doc/tp_individual/coverage --html
 
       - name: Add redirect
         run: echo '<meta http-equiv="refresh" content="0;url=tp_individual/index.html">' > target/doc/index.html

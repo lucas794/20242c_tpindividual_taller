@@ -1,3 +1,4 @@
+/// # For coverage details, see the [Coverage Report](coverage/html/index.html).
 pub mod conditions;
 pub mod consults;
 pub mod errors;
