@@ -1460,8 +1460,9 @@
         <span class="kw">let </span><span class="kw-2">mut </span>temporal_file = BufWriter::new(File::create(formal_path)<span class="question-mark">?</span>);
 
         temporal_file.write_all(columns_from_csv.as_bytes())<span class="question-mark">?</span>;
+        temporal_file.write_all(<span class="string">"\n"</span>.as_bytes())<span class="question-mark">?</span>;
 
-        <span class="kw">for </span>line <span class="kw">in </span>BufReader::new(<span class="kw-2">&amp;</span><span class="self">self</span>.file).lines() {
+        <span class="kw">for </span>line <span class="kw">in </span>BufReader::new(<span class="kw-2">&amp;</span><span class="self">self</span>.file).lines().skip(<span class="number">1</span>) {
             <span class="kw">let </span>line = line<span class="question-mark">?</span>;
             <span class="kw">let </span>splitted_line = line.split(<span class="string">","</span>).collect::&lt;Vec&lt;<span class="kw-2">&amp;</span>str&gt;&gt;();
 
@@ -1483,15 +1484,14 @@
                     <span class="comment">// lets see all keys and values
                     </span><span class="kw">match </span>condition.matches_condition(str_conditions) {
                         <span class="prelude-val">Ok</span>(<span class="bool-val">true</span>) =&gt; {
-                            temporal_file.write_all(line.as_bytes())<span class="question-mark">?</span>;
-                            temporal_file.write_all(<span class="string">"\n"</span>.as_bytes())<span class="question-mark">?</span>;
-                        }
+                            <span class="comment">// critera matches? we do nothing
+                        </span>}
                         <span class="prelude-val">Ok</span>(<span class="bool-val">false</span>) =&gt; {
                             <span class="comment">// criteria reached, we need to change the index
                             // of the columns according to the hash database with the proper value
-                            /*temporal_file.write_all(line.as_bytes())?;
-                            temporal_file.write_all("\n".as_bytes())?;*/
-                        </span>}
+                            </span>temporal_file.write_all(line.as_bytes())<span class="question-mark">?</span>;
+                            temporal_file.write_all(<span class="string">"\n"</span>.as_bytes())<span class="question-mark">?</span>;
+                        }
                         <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
                             <span class="kw">return </span><span class="prelude-val">Err</span>(std::io::Error::new(
                                 std::io::ErrorKind::Other,
@@ -1562,7 +1562,7 @@
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>new() {
-        <span class="kw">let </span>table = Table::new(<span class="string">"./tests/test_tables/database.csv"</span>.to_string()).unwrap();
+        <span class="kw">let </span>table = Table::new(<span class="string">"./tests/data/database.csv"</span>.to_string()).unwrap();
         <span class="kw">let </span>filename = table.get_file_name().unwrap();
         <span class="macro">assert_eq!</span>(filename, <span class="string">"database"</span>);
     }
@@ -1579,7 +1579,7 @@
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>invalid_column() {
-        <span class="kw">let </span><span class="kw-2">mut </span>table = Table::new(<span class="string">"./tests/test_tables/database.csv"</span>.to_string()).unwrap();
+        <span class="kw">let </span><span class="kw-2">mut </span>table = Table::new(<span class="string">"./tests/data/database.csv"</span>.to_string()).unwrap();
 
         <span class="comment">// tesis is the invalid columns
         </span><span class="kw">let </span>columns = <span class="macro">vec!</span>[<span class="string">"Edad"</span>.to_string(), <span class="string">"Tesis"</span>.to_string()];
@@ -1590,7 +1590,7 @@
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>invalid_column_when_sorting() {
-        <span class="kw">let </span><span class="kw-2">mut </span>table = Table::new(<span class="string">"./tests/test_tables/database.csv"</span>.to_string()).unwrap();
+        <span class="kw">let </span><span class="kw-2">mut </span>table = Table::new(<span class="string">"./tests/data/database.csv"</span>.to_string()).unwrap();
 
         <span class="comment">// tesis is the invalid columns
         </span><span class="kw">let </span>columns = <span class="macro">vec!</span>[<span class="string">"Nombre"</span>.to_string(), <span class="string">"Edad"</span>.to_string()];
@@ -1611,7 +1611,7 @@
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>return_select_returns_ok() {
-        <span class="kw">let </span><span class="kw-2">mut </span>table = Table::new(<span class="string">"./tests/test_tables/database.csv"</span>.to_string()).unwrap();
+        <span class="kw">let </span><span class="kw-2">mut </span>table = Table::new(<span class="string">"./tests/data/database.csv"</span>.to_string()).unwrap();
 
         <span class="kw">let </span>columns = <span class="macro">vec!</span>[<span class="string">"Nombre"</span>.to_string(), <span class="string">"Edad"</span>.to_string()];
         <span class="kw">let </span>result = table.resolve_select(columns, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>);
@@ -1620,7 +1620,7 @@
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>return_select_returns_ok_with_conditions() {
-        <span class="kw">let </span><span class="kw-2">mut </span>table = Table::new(<span class="string">"./tests/test_tables/database.csv"</span>.to_string()).unwrap();
+        <span class="kw">let </span><span class="kw-2">mut </span>table = Table::new(<span class="string">"./tests/data/database.csv"</span>.to_string()).unwrap();
 
         <span class="kw">let </span>columns = <span class="macro">vec!</span>[<span class="string">"Nombre"</span>.to_string(), <span class="string">"Edad"</span>.to_string()];
         <span class="kw">let </span>conditions = <span class="prelude-val">Some</span>(<span class="string">"Nombre = 'Luis' AND Edad = 29"</span>);
@@ -1639,7 +1639,7 @@
         <span class="comment">// I'm trying to do a SELECT Edad, Nombre FROM table WHERE Edad = 45;
         // Edad = 45 only to get one result.
 
-        </span><span class="kw">let </span><span class="kw-2">mut </span>table = Table::new(<span class="string">"./tests/test_tables/database.csv"</span>.to_string()).unwrap();
+        </span><span class="kw">let </span><span class="kw-2">mut </span>table = Table::new(<span class="string">"./tests/data/database.csv"</span>.to_string()).unwrap();
         <span class="kw">let </span>columns = <span class="macro">vec!</span>[<span class="string">"Edad"</span>.to_string(), <span class="string">"Nombre"</span>.to_string()];
         <span class="kw">let </span>conditions = <span class="prelude-val">Some</span>(<span class="string">"Edad = 45"</span>);
         <span class="kw">let </span>sorting = <span class="prelude-val">None</span>;
@@ -1662,7 +1662,7 @@
         <span class="comment">// I'm trying to do a SELECT Nombre FROM table WHERE Edad = 45;
         // So i'm going to get only Carlos as result.
 
-        </span><span class="kw">let </span><span class="kw-2">mut </span>table = Table::new(<span class="string">"./tests/test_tables/database.csv"</span>.to_string()).unwrap();
+        </span><span class="kw">let </span><span class="kw-2">mut </span>table = Table::new(<span class="string">"./tests/data/database.csv"</span>.to_string()).unwrap();
         <span class="kw">let </span>columns = <span class="macro">vec!</span>[<span class="string">"Nombre"</span>.to_string()];
         <span class="kw">let </span>conditions = <span class="prelude-val">Some</span>(<span class="string">"Edad = 45"</span>);
         <span class="kw">let </span>sorting = <span class="prelude-val">None</span>;
@@ -1683,7 +1683,7 @@
         <span class="comment">// I'm trying to do a SELECT \"Correo electronico\" FROM table WHERE Edad = 45;
         // So i'm going to get only csanchez@gmail.com as result.
 
-        </span><span class="kw">let </span><span class="kw-2">mut </span>table = Table::new(<span class="string">"./tests/test_tables/database.csv"</span>.to_string()).unwrap();
+        </span><span class="kw">let </span><span class="kw-2">mut </span>table = Table::new(<span class="string">"./tests/data/database.csv"</span>.to_string()).unwrap();
         <span class="kw">let </span>columns = <span class="macro">vec!</span>[<span class="string">"Correo electronico"</span>.to_string()];
         <span class="kw">let </span>conditions = <span class="prelude-val">Some</span>(<span class="string">"Edad = 45"</span>);
         <span class="kw">let </span>sorting = <span class="prelude-val">None</span>;
@@ -1703,7 +1703,7 @@
     }
     <span class="attr">#[test]
     </span><span class="kw">fn </span>return_select_returns_ok_with_nested_parenthesis_condition() {
-        <span class="kw">let </span><span class="kw-2">mut </span>table = Table::new(<span class="string">"./tests/test_tables/database.csv"</span>.to_string()).unwrap();
+        <span class="kw">let </span><span class="kw-2">mut </span>table = Table::new(<span class="string">"./tests/data/database.csv"</span>.to_string()).unwrap();
 
         <span class="kw">let </span>columns = <span class="macro">vec!</span>[<span class="string">"Nombre"</span>.to_string(), <span class="string">"Profesion"</span>.to_string()];
         <span class="kw">let </span>conditions = <span class="prelude-val">Some</span>(<span class="string">"(Edad &gt;= 32 AND Edad &lt;= 40) AND (Nombre = Juan OR Nombre = Pedro)"</span>);

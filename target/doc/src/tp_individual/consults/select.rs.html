@@ -194,7 +194,7 @@
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>execute_select_fails_with_invalid_columns() {
-        <span class="kw">let </span><span class="kw-2">mut </span>table = Table::new(<span class="string">"./tests/test_tables/database.csv"</span>.to_string()).unwrap();
+        <span class="kw">let </span><span class="kw-2">mut </span>table = Table::new(<span class="string">"./tests/data/database.csv"</span>.to_string()).unwrap();
         <span class="kw">let </span>select = Select::new();
         <span class="comment">// i'm trying to select a column that does not exist
         </span><span class="kw">let </span>columns = <span class="macro">vec!</span>[<span class="string">"Trabajo Profesional"</span>.to_string()];
