@@ -1,3 +1,0 @@
-(function() {var implementors = {
-"tp_individual":[["impl&lt;'a&gt; <a class=\"trait\" href=\"https://doc.rust-lang.org/1.80.1/core/error/trait.Error.html\" title=\"trait core::error::Error\">Error</a> for <a class=\"enum\" href=\"tp_individual/errors/enum.TPErrors.html\" title=\"enum tp_individual::errors::TPErrors\">TPErrors</a>&lt;'a&gt;"]]
-};if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
