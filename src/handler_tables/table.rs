@@ -600,8 +600,9 @@ impl Table {
         let mut temporal_file = BufWriter::new(File::create(formal_path)?);
 
         temporal_file.write_all(columns_from_csv.as_bytes())?;
+        temporal_file.write_all("\n".as_bytes())?;
 
-        for line in BufReader::new(&self.file).lines() {
+        for line in BufReader::new(&self.file).lines().skip(1) {
             let line = line?;
             let splitted_line = line.split(",").collect::<Vec<&str>>();
 
@@ -623,14 +624,13 @@ impl Table {
                     // lets see all keys and values
                     match condition.matches_condition(str_conditions) {
                         Ok(true) => {
-                            temporal_file.write_all(line.as_bytes())?;
-                            temporal_file.write_all("\n".as_bytes())?;
+                            // critera matches? we do nothing
                         }
                         Ok(false) => {
                             // criteria reached, we need to change the index
                             // of the columns according to the hash database with the proper value
-                            /*temporal_file.write_all(line.as_bytes())?;
-                            temporal_file.write_all("\n".as_bytes())?;*/
+                            temporal_file.write_all(line.as_bytes())?;
+                            temporal_file.write_all("\n".as_bytes())?;
                         }
                         Err(_) => {
                             return Err(std::io::Error::new(
