@@ -702,7 +702,7 @@ mod tests {
 
     #[test]
     fn new() {
-        let table = Table::new("./tests/test_tables/database.csv".to_string()).unwrap();
+        let table = Table::new("./tests/data/database.csv".to_string()).unwrap();
         let filename = table.get_file_name().unwrap();
         assert_eq!(filename, "database");
     }
@@ -719,7 +719,7 @@ mod tests {
 
     #[test]
     fn invalid_column() {
-        let mut table = Table::new("./tests/test_tables/database.csv".to_string()).unwrap();
+        let mut table = Table::new("./tests/data/database.csv".to_string()).unwrap();
 
         // tesis is the invalid columns
         let columns = vec!["Edad".to_string(), "Tesis".to_string()];
@@ -730,7 +730,7 @@ mod tests {
 
     #[test]
     fn invalid_column_when_sorting() {
-        let mut table = Table::new("./tests/test_tables/database.csv".to_string()).unwrap();
+        let mut table = Table::new("./tests/data/database.csv".to_string()).unwrap();
 
         // tesis is the invalid columns
         let columns = vec!["Nombre".to_string(), "Edad".to_string()];
@@ -751,7 +751,7 @@ mod tests {
 
     #[test]
     fn return_select_returns_ok() {
-        let mut table = Table::new("./tests/test_tables/database.csv".to_string()).unwrap();
+        let mut table = Table::new("./tests/data/database.csv".to_string()).unwrap();
 
         let columns = vec!["Nombre".to_string(), "Edad".to_string()];
         let result = table.resolve_select(columns, None, None);
@@ -760,7 +760,7 @@ mod tests {
 
     #[test]
     fn return_select_returns_ok_with_conditions() {
-        let mut table = Table::new("./tests/test_tables/database.csv".to_string()).unwrap();
+        let mut table = Table::new("./tests/data/database.csv".to_string()).unwrap();
 
         let columns = vec!["Nombre".to_string(), "Edad".to_string()];
         let conditions = Some("Nombre = 'Luis' AND Edad = 29");
@@ -779,7 +779,7 @@ mod tests {
         // I'm trying to do a SELECT Edad, Nombre FROM table WHERE Edad = 45;
         // Edad = 45 only to get one result.
 
-        let mut table = Table::new("./tests/test_tables/database.csv".to_string()).unwrap();
+        let mut table = Table::new("./tests/data/database.csv".to_string()).unwrap();
         let columns = vec!["Edad".to_string(), "Nombre".to_string()];
         let conditions = Some("Edad = 45");
         let sorting = None;
@@ -802,7 +802,7 @@ mod tests {
         // I'm trying to do a SELECT Nombre FROM table WHERE Edad = 45;
         // So i'm going to get only Carlos as result.
 
-        let mut table = Table::new("./tests/test_tables/database.csv".to_string()).unwrap();
+        let mut table = Table::new("./tests/data/database.csv".to_string()).unwrap();
         let columns = vec!["Nombre".to_string()];
         let conditions = Some("Edad = 45");
         let sorting = None;
@@ -823,7 +823,7 @@ mod tests {
         // I'm trying to do a SELECT \"Correo electronico\" FROM table WHERE Edad = 45;
         // So i'm going to get only csanchez@gmail.com as result.
 
-        let mut table = Table::new("./tests/test_tables/database.csv".to_string()).unwrap();
+        let mut table = Table::new("./tests/data/database.csv".to_string()).unwrap();
         let columns = vec!["Correo electronico".to_string()];
         let conditions = Some("Edad = 45");
         let sorting = None;
@@ -843,7 +843,7 @@ mod tests {
     }
     #[test]
     fn return_select_returns_ok_with_nested_parenthesis_condition() {
-        let mut table = Table::new("./tests/test_tables/database.csv".to_string()).unwrap();
+        let mut table = Table::new("./tests/data/database.csv".to_string()).unwrap();
 
         let columns = vec!["Nombre".to_string(), "Profesion".to_string()];
         let conditions = Some("(Edad >= 32 AND Edad <= 40) AND (Nombre = Juan OR Nombre = Pedro)");

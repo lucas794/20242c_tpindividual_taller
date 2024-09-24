@@ -90,7 +90,7 @@ mod tests {
 
     #[test]
     fn execute_select_fails_with_invalid_columns() {
-        let mut table = Table::new("./tests/test_tables/database.csv".to_string()).unwrap();
+        let mut table = Table::new("./tests/data/database.csv".to_string()).unwrap();
         let select = Select::new();
         // i'm trying to select a column that does not exist
         let columns = vec!["Trabajo Profesional".to_string()];

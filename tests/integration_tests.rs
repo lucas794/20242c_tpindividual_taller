@@ -10,7 +10,7 @@ use process::Command;
 #[test]
 fn integration_simple_select_query() {
     let route_file = format!("./tests/select_query_{}.csv", std::process::id());
-    let argument = format!("cargo run -- ./tests/test_tables \"SELECT Nombre, Edad FROM database WHERE Edad >= 33;\" > {}", route_file);
+    let argument = format!("cargo run -- ./tests/data \"SELECT Nombre, Edad FROM database WHERE Edad >= 33;\" > {}", route_file);
     let mut command = Command::new("sh") // Use "cmd" for Windows
         .arg("-c") // Execute a shell command
         .arg(argument)
@@ -56,7 +56,7 @@ fn integration_simple_select_query() {
 #[test]
 fn integration_advanced_select_query() {
     let route_file = format!("./tests/select_advanced_query_{}.csv", std::process::id());
-    let argument = format!("cargo run -- ./tests/test_tables \"SELECT Nombre, Edad FROM database WHERE (Nombre = Luis OR Edad > 15) AND NOT Nombre = Paula;\" > {}", route_file);
+    let argument = format!("cargo run -- ./tests/data \"SELECT Nombre, Edad FROM database WHERE (Nombre = Luis OR Edad > 15) AND NOT Nombre = Paula;\" > {}", route_file);
     let mut command = Command::new("sh") // Use "cmd" for Windows
         .arg("-c") // Execute a shell command
         .arg(argument)
@@ -111,7 +111,7 @@ fn integration_insert_query() {
     let _ = File::create(&route_file).unwrap();
 
     // lets clone the file
-    fs::copy("./tests/test_tables/database.csv", &route_file).unwrap();
+    fs::copy("./tests/data/database.csv", &route_file).unwrap();
 
     let table_name_start = route_file.rfind("/").unwrap() + 1;
     let table_name_end = route_file.rfind(".").unwrap();
@@ -151,7 +151,7 @@ fn integration_update_query() {
     let _ = File::create(&route_file).unwrap();
 
     // lets clone the file
-    fs::copy("./tests/test_tables/database.csv", &route_file).unwrap();
+    fs::copy("./tests/data/database.csv", &route_file).unwrap();
 
     let table_name_start = route_file.rfind("/").unwrap() + 1;
     let table_name_end = route_file.rfind(".").unwrap();
@@ -191,7 +191,7 @@ fn integration_delete_query() {
     let _ = File::create(&route_file).unwrap();
 
     // lets clone the file
-    fs::copy("./tests/test_tables/database.csv", &route_file).unwrap();
+    fs::copy("./tests/data/database.csv", &route_file).unwrap();
 
     let table_name_start = route_file.rfind("/").unwrap() + 1;
     let table_name_end = route_file.rfind(".").unwrap();

@@ -28,6 +28,9 @@ jobs:
       - name: Configure cache
         uses: Swatinem/rust-cache@v2
 
+      - name: Install LLVM
+        run: sudo apt-get install -y llvm
+
       - name: Setup pages
         id: pages
         uses: actions/configure-pages@v4
@@ -39,7 +42,8 @@ jobs:
         run: cargo doc --no-deps
       
       - name: Generate llvm coverage 
-        run : cargo llvm-cov --output-dir target/doc/tp_individual/coverage --html
+        run : |
+            cargo llvm-cov --output-dir target/doc/tp_individual/coverage --html
 
       - name: Add redirect
         run: echo '<meta http-equiv="refresh" content="0;url=tp_individual/index.html">' > target/doc/index.html
