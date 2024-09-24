@@ -16,3 +16,20 @@ impl Display for Tperrors {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_display() {
+        let error = Tperrors::Generic("Error".to_string());
+        assert_eq!(error.to_string(), "ERROR: Error");
+
+        let error = Tperrors::Table("Error".to_string());
+        assert_eq!(error.to_string(), "INVALID_TABLE: Error");
+
+        let error = Tperrors::Syntax("Error".to_string());
+        assert_eq!(error.to_string(), "INVALID_SYNTAX: Error");
+    }
+}

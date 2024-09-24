@@ -66,3 +66,24 @@ impl Insert {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_valid_query() {
+        let insert = Insert::new();
+        let query = "INSERT INTO table VALUES ('Juan', 20);";
+        assert_eq!(insert.is_valid_query(query), true);
+
+        let query = "INSERT INTO table VALUES ('Juan', 20)";
+        assert_eq!(insert.is_valid_query(query), false);
+
+        let query = "INSERT INTO table ('Juan', 20);";
+        assert_eq!(insert.is_valid_query(query), false);
+
+        let query = "INSERT INTO table VALUES ('Juan', 20)";
+        assert_eq!(insert.is_valid_query(query), false);
+    }
+}

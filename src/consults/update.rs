@@ -84,3 +84,31 @@ impl Update {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_valid_query() {
+        let update = Update::new();
+
+        let query = "UPDATE table_name SET column1 = value1, column2 = value2 WHERE condition;";
+        assert_eq!(update.is_valid_query(query), true);
+
+        let query = "UPDATE table_name SET column1 = value1, column2 = value2;";
+        assert_eq!(update.is_valid_query(query), true);
+
+        let query = "UPDATE table_name SET column1 = value1, column2 = value2";
+        assert_eq!(update.is_valid_query(query), false);
+
+        let query = "UPDATE table_name SET column1 = value1, column2 = value2 WHERE condition";
+        assert_eq!(update.is_valid_query(query), false);
+
+        let query = "UPDATE table_name SET column1 = value1, column2 = value2 WHERE condition";
+        assert_eq!(update.is_valid_query(query), false);
+
+        let query = "UPDATE table_name SET column1 = value1, column2 = value2 WHERE condition";
+        assert_eq!(update.is_valid_query(query), false);
+    }
+}

@@ -70,3 +70,24 @@ impl Delete {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_valid_query() {
+        let delete = Delete::new();
+        let query = "DELETE FROM table;";
+        assert_eq!(delete.is_valid_query(query), true);
+
+        let query = "DELETE FROM table";
+        assert_eq!(delete.is_valid_query(query), false);
+
+        let query = "DELETE FROM table";
+        assert_eq!(delete.is_valid_query(query), false);
+
+        let query = "DELETE FROM table";
+        assert_eq!(delete.is_valid_query(query), false);
+    }
+}
