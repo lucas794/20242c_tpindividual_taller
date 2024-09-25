@@ -1,4 +1,4 @@
-# [SQL Rustico](https://taller-1-fiuba-rust.github.io/proyecto/24C2/ejercicio_individual.html) - [Taller de Programación I](https://taller-1-fiuba-rust.github.io/inicio.html) - Cátedra Deymonnaz - 2C2024
+# [SQL Rustico](https://taller-1-fiuba-rust.github.io/proyecto/24C2/ejercicio_individual.html)<br />[Taller de Programación I](https://taller-1-fiuba-rust.github.io/inicio.html)<br />Cátedra Deymonnaz - 2C2024  
 
 ## Resumen
 El trabajo consiste en basicamente realizar un motor sencillo de bases de datos, basados en SQL.
@@ -17,7 +17,7 @@ Donde:
     Ejemplo: 
 
     ```
-    cargo run -- ./tables "SELECT * FROM default_tables" WHERE Edad >= 45;"
+    cargo run -- ./tables "SELECT * FROM clientes WHERE Edad >= 45;"
     ```
 
     Mostrará por terminal
@@ -30,7 +30,7 @@ Donde:
     Si se desea redireccionar su contenido:
 
     ```
-    cargo run -- ./tables "SELECT * FROM default_tables" WHERE Edad >= 45;" > result_select.csv
+    cargo run -- ./tables "SELECT * FROM clientes WHERE Edad >= 45;" > result_select.csv
     ```
 
     Se generará un archivo result_select del tipo CSV con los resultados de la búsqueda.
@@ -38,9 +38,9 @@ Donde:
 * Las consultas UPDATE, INSERT, DELETE son ejecutadas sobre el archivo que se está trabajando
     Ejemplos
     ```
-    cargo run -- ./tables "UPDATE default_file SET Nombre = 'Github', Edad = 45 WHERE Edad = 31;" # Se ejecuta un update
-    cargo run -- ./tables "DELETE FROM default_file;" # Se ejecuta un delete, en este caso particular se borra todo el archivo
-    cargo run -- ./tables "INSERT INTO default_file (Nombre, Edad) VALUES ('Juan', 20);" #Se inserta un valor en la base de datos
+    cargo run -- ./tables "UPDATE clientes SET Nombre = 'Github', Edad = 45 WHERE Edad = 31;" # Se ejecuta un update
+    cargo run -- ./tables "DELETE FROM clientes;" # Se ejecuta un delete, en este caso particular se borra todo el archivo
+    cargo run -- ./tables "INSERT INTO clientes (Nombre, Edad) VALUES ('Juan', 20);" #Se inserta un valor en la base de datos
     ```
 
     > Aclaración: ***si se va a ejecutar algún comando, utilizar la carpeta ./tables como referencia***
@@ -75,5 +75,9 @@ cargo test --test '*'
 - [x] Agregado por mi parte (no es parte de la corrección): Se agregó un struct Sorter.
 - [x] SELECT: Las consultas ahora se devuelven en el orden ingresado de las columnas.
 - [x] SELECT: Las consultas ahora permiten condicionales que no estén ingresadas en la query (Ejemplo SELECT Edad FROM table WHERE Nombre = 'Luis')
-- [x] TODAS LAS CONSULTAS: Fix en columnas que tenian nombre espaciado
+- [x] INSERT: Solucionado problema de ingreso de un valor nuevo
+- [x] DELETE: Solucionado problema de la eliminación de un elemento de la tabla.
+- [x] TODAS LAS CONSULTAS: Fix en columnas que tenian nombre espaciado.
 - [x] Test agregados para estas nuevas features mencionadas previamente
+- [x] Separación de integration_test a clases para cada tipo de consulta.
+- [x] Correccion README.exe
