@@ -46,9 +46,10 @@ Donde:
     > Aclaración: ***si se va a ejecutar algún comando, utilizar la carpeta ./tables como referencia***
 
 ## Pruebas
+
 > [!NOTE]
-> No tocar el archivo database.csv que está en ./tests/test_tables dado que los test se realizan
-> haciendo una copia exacta de ese archivo y corriendo las pruebas 
+> No tocar el archivo database.csv que está en ./tests/test_tables dado que los tests unitarios
+> lo utilizan para las pruebas.
 
 Para correr **TODAS** las pruebas, se deberá correr el comando
 `
@@ -59,9 +60,6 @@ Para ***solo*** correr las pruebas de integración, se deberá correr el comando
 `
 cargo test --test '*'
 `
-
-> [!WARNING]
-> En algunos casos, por alguna razón, los test NO corren por lectura/escritura de archivos simultaneamente. Correr cargo test nuevamente en esos casos, todas las entregas se dan con cargo test verificado.
 
 ## Correcciones realizadas
 
@@ -81,3 +79,4 @@ cargo test --test '*'
 - [x] Test agregados para estas nuevas features mencionadas previamente
 - [x] Separación de integration_test a clases para cada tipo de consulta.
 - [x] Correccion README.exe
+- [x] Setup "common" para los test de INSERT/DELETE/UPDATE (para evitar problemas de corrida de tests simultaneamente)
