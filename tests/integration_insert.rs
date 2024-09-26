@@ -1,19 +1,14 @@
 use std::{
-    fs::{self, File},
+    fs::File,
     io::{BufRead, BufReader},
     process::Command,
 };
-
+mod common;
 #[test]
 fn integration_insert_query_without_all_columns_used() {
     // create a new file;
-    let route_file = format!("./tests/insert_query_{}.csv", std::process::id());
-
-    // create a file
-    let _ = File::create(&route_file).unwrap();
-
-    // lets clone the file
-    fs::copy("./tests/data/database.csv", &route_file).unwrap();
+    let route_file = format!("./tests/insert_query_without_all_columns.csv");
+    common::setup(&route_file);
 
     let table_name_start = route_file.rfind("/").unwrap() + 1;
     let table_name_end = route_file.rfind(".").unwrap();
@@ -31,7 +26,7 @@ fn integration_insert_query_without_all_columns_used() {
         .unwrap();
 
     command.wait().unwrap();
-    std::thread::sleep(std::time::Duration::from_millis(30));
+
     // lets read the last line of the file
     let reader = BufReader::new(File::open(&route_file).unwrap());
 
@@ -39,21 +34,17 @@ fn integration_insert_query_without_all_columns_used() {
 
     let expected_output = "Juan,,20,,"; // other commands are NULL.
 
-    let _ = std::fs::remove_file(&route_file);
-
     assert_eq!(last_line, expected_output);
+
+    let _ = std::fs::remove_file(&route_file);
 }
 
 #[test]
 fn integration_insert_query_with_all_columns_used() {
     // create a new file;
-    let route_file = format!("./tests/insert_query_{}.csv", std::process::id() + 1);
+    let route_file = format!("./tests/insert_query_with_all_columns.csv");
 
-    // create a file
-    let _ = File::create(&route_file).unwrap();
-
-    // lets clone the file
-    fs::copy("./tests/data/database.csv", &route_file).unwrap();
+    common::setup(&route_file);
 
     let table_name_start = route_file.rfind("/").unwrap() + 1;
     let table_name_end = route_file.rfind(".").unwrap();
@@ -71,7 +62,7 @@ fn integration_insert_query_with_all_columns_used() {
         .unwrap();
 
     command.wait().unwrap();
-    std::thread::sleep(std::time::Duration::from_millis(30));
+
     // lets read the last line of the file
     let reader = BufReader::new(File::open(&route_file).unwrap());
 
@@ -79,7 +70,6 @@ fn integration_insert_query_with_all_columns_used() {
 
     let expected_output = "Juan,Carolo,22,test@gmail.com,maestro"; // other commands are NULL.
 
-    let _ = std::fs::remove_file(&route_file);
-
     assert_eq!(last_line, expected_output);
+    let _ = std::fs::remove_file(&route_file);
 }

@@ -1,20 +1,16 @@
 use std::{
-    fs::{self, File},
+    fs::File,
     io::{BufRead, BufReader},
     process::Command,
 };
 
+mod common;
 #[test]
 fn integration_delete_paula_from_database() {
     // paula is at the last position of the database
     // create a new file;
-    let route_file = format!("./tests/delete_query_{}.csv", std::process::id() + 2424);
-
-    // create a file
-    let _ = File::create(&route_file).unwrap();
-
-    // lets clone the file
-    fs::copy("./tests/data/database.csv", &route_file).unwrap();
+    let route_file = format!("./tests/delete_query_deletion_paula.csv");
+    common::setup(&route_file);
 
     let table_name_start = route_file.rfind("/").unwrap() + 1;
     let table_name_end = route_file.rfind(".").unwrap();
@@ -33,8 +29,6 @@ fn integration_delete_paula_from_database() {
 
     command.wait().unwrap();
 
-    // we are basically deleting the whole database, ONLY the header remains..
-
     let reader = BufReader::new(File::open(&route_file).unwrap());
 
     let last_line = reader.lines().last().unwrap().unwrap();
@@ -51,13 +45,8 @@ fn integration_delete_paula_from_database() {
 #[test]
 fn integration_delete_whole_database_query() {
     // create a new file;
-    let route_file = format!("./tests/delete_query_{}.csv", std::process::id() + 5252);
-
-    // create a file
-    let _ = File::create(&route_file).unwrap();
-
-    // lets clone the file
-    fs::copy("./tests/data/database.csv", &route_file).unwrap();
+    let route_file = format!("./tests/delete_query_whole_database.csv");
+    common::setup(&route_file);
 
     let table_name_start = route_file.rfind("/").unwrap() + 1;
     let table_name_end = route_file.rfind(".").unwrap();
@@ -72,9 +61,6 @@ fn integration_delete_whole_database_query() {
         .unwrap();
 
     command.wait().unwrap();
-
-    // we are basically deleting the whole database, ONLY the header remains..
-    std::thread::sleep(std::time::Duration::from_millis(30));
 
     let reader = BufReader::new(File::open(&route_file).unwrap());
 

@@ -1,19 +1,15 @@
 use std::{
-    fs::{self, File},
+    fs::File,
     io::{BufRead, BufReader},
     process::Command,
 };
 
+mod common;
 #[test]
 fn integration_update_simple_query() {
     // create a new file;
-    let route_file = format!("./tests/update_query_{}.csv", std::process::id());
-
-    // create a file
-    let _ = File::create(&route_file).unwrap();
-
-    // lets clone the file
-    fs::copy("./tests/data/database.csv", &route_file).unwrap();
+    let route_file = format!("./tests/update_query_simple_query.csv");
+    common::setup(&route_file);
 
     let table_name_start = route_file.rfind("/").unwrap() + 1;
     let table_name_end = route_file.rfind(".").unwrap();
@@ -31,7 +27,7 @@ fn integration_update_simple_query() {
         .unwrap();
 
     command.wait().unwrap();
-    std::thread::sleep(std::time::Duration::from_millis(30));
+
     // lets read the last line of the file
     let reader = BufReader::new(File::open(&route_file).unwrap());
 
@@ -47,13 +43,8 @@ fn integration_update_simple_query() {
 #[test]
 fn integration_update_all_values_query() {
     // create a new file;
-    let route_file = format!("./tests/update_query_{}.csv", std::process::id() + 124);
-
-    // create a file
-    let _ = File::create(&route_file).unwrap();
-
-    // lets clone the file
-    fs::copy("./tests/data/database.csv", &route_file).unwrap();
+    let route_file = format!("./tests/update_query_update_all.csv");
+    common::setup(&route_file);
 
     let table_name_start = route_file.rfind("/").unwrap() + 1;
     let table_name_end = route_file.rfind(".").unwrap();
@@ -73,7 +64,6 @@ fn integration_update_all_values_query() {
         .unwrap();
 
     command.wait().unwrap();
-
     // lets read the last line of the file
     let reader = BufReader::new(File::open(&route_file).unwrap());
 
