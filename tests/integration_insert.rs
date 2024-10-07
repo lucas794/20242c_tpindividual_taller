@@ -3,7 +3,7 @@ use std::{
     io::{BufRead, BufReader},
     process::Command,
 };
-mod common;
+pub mod common;
 #[test]
 fn integration_insert_query_without_all_columns_used() {
     // create a new file;
@@ -29,14 +29,13 @@ fn integration_insert_query_without_all_columns_used() {
 
     // lets read the last line of the file
     let reader = BufReader::new(File::open(&route_file).unwrap());
+    let _ = std::fs::remove_file(&route_file);
 
     let last_line = reader.lines().last().unwrap().unwrap();
 
-    let expected_output = "Juan,,20,,"; // other commands are NULL.
+    let expected_output = ",Juan,,20,,"; // other commands are NULL.
 
     assert_eq!(last_line, expected_output);
-
-    let _ = std::fs::remove_file(&route_file);
 }
 
 #[test]
@@ -65,11 +64,11 @@ fn integration_insert_query_with_all_columns_used() {
 
     // lets read the last line of the file
     let reader = BufReader::new(File::open(&route_file).unwrap());
+    let _ = std::fs::remove_file(&route_file);
 
     let last_line = reader.lines().last().unwrap().unwrap();
 
-    let expected_output = "Juan,Carolo,22,test@gmail.com,maestro"; // other commands are NULL.
+    let expected_output = ",Juan,Carolo,22,test@gmail.com,maestro"; // other commands are NULL.
 
     assert_eq!(last_line, expected_output);
-    let _ = std::fs::remove_file(&route_file);
 }

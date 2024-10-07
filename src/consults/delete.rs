@@ -1,3 +1,5 @@
+use std::io::{Read, Seek};
+
 use crate::errors::{fileerrors::FileErrors, tperrors::Tperrors};
 use crate::handler_tables::table::Table;
 
@@ -28,30 +30,27 @@ impl Delete {
     }
 
     /// Execute the delete query
-    pub fn execute_delete(
+    pub fn execute_delete<R: Read + Seek>(
         &self,
-        table: &mut Table,
+        table: &mut Table<R>,
         conditions: Option<&str>,
     ) -> Result<(), Tperrors> {
         let resolve = table.resolve_delete(conditions);
-
         match resolve {
-            Ok(_) => {
-                match table.replace_original_with_tempfile() {
-                    Ok(_) => {}
+            Ok(temp_file_dir) => {
+                match table.replace_original_with(temp_file_dir) {
+                    Ok(_) => {
+                        Ok(()) // everything done propertly.
+                    }
                     Err(e) => match e {
                         FileErrors::DeletionFailed => {
-                            return Err(Tperrors::Generic("Deletion failed".to_string()));
+                            Err(Tperrors::Generic("Deletion failed".to_string()))
                         }
-                        FileErrors::InvalidFile => {
-                            return Err(Tperrors::Generic(
-                                "Error while updating the file".to_string(),
-                            ));
-                        }
+                        FileErrors::InvalidFile => Err(Tperrors::Generic(
+                            "Error while updating the file".to_string(),
+                        )),
                     },
                 }
-
-                Ok(())
             }
             Err(e) => {
                 let formatted_error = format!("{}", e);
@@ -80,12 +79,6 @@ mod tests {
         let delete = Delete::new();
         let query = "DELETE FROM table;";
         assert_eq!(delete.is_valid_query(query), true);
-
-        let query = "DELETE FROM table";
-        assert_eq!(delete.is_valid_query(query), false);
-
-        let query = "DELETE FROM table";
-        assert_eq!(delete.is_valid_query(query), false);
 
         let query = "DELETE FROM table";
         assert_eq!(delete.is_valid_query(query), false);

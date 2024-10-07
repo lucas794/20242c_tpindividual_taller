@@ -1,3 +1,5 @@
+use std::io::{Read, Seek};
+
 use crate::errors::fileerrors::*;
 use crate::errors::tperrors::Tperrors;
 use crate::handler_tables::table::*;
@@ -40,9 +42,9 @@ impl Update {
     /// UPDATE table_name SET column1 = value1, column2 = value2 WHERE condition;
     ///
     /// UPDATE table_name SET column1 = value1, column2 = value2;
-    pub fn execute_update(
+    pub fn execute_update<R: Read + Seek>(
         &self,
-        table: &mut Table,
+        table: &mut Table<R>,
         columns: Vec<String>,
         values: Vec<String>,
         conditions: Option<&str>,
@@ -50,8 +52,8 @@ impl Update {
         let resolve = table.resolve_update(columns, values, conditions);
 
         match resolve {
-            Ok(_) => {
-                match table.replace_original_with_tempfile() {
+            Ok(temporal_directory_filename) => {
+                match table.replace_original_with(temporal_directory_filename) {
                     Ok(_) => {}
                     Err(e) => match e {
                         FileErrors::DeletionFailed => {
@@ -90,7 +92,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_is_valid_query() {
+    fn test_multiple_update_querys_passes() {
         let update = Update::new();
 
         let query = "UPDATE table_name SET column1 = value1, column2 = value2 WHERE condition;";

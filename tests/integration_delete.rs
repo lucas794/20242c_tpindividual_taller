@@ -4,7 +4,8 @@ use std::{
     process::Command,
 };
 
-mod common;
+pub mod common;
+
 #[test]
 fn integration_delete_paula_from_database() {
     // paula is at the last position of the database
@@ -30,14 +31,11 @@ fn integration_delete_paula_from_database() {
     command.wait().unwrap();
 
     let reader = BufReader::new(File::open(&route_file).unwrap());
+    let _ = std::fs::remove_file(&route_file).unwrap();
 
     let last_line = reader.lines().last().unwrap().unwrap();
 
-    let expected_output = "Diego,Navarro,39,dnavarro@gmail.com,empresario";
-
-    assert_eq!(last_line, expected_output);
-
-    let _ = std::fs::remove_file(&route_file).unwrap();
+    let expected_output = "9,Diego,Navarro,39,dnavarro@gmail.com,empresario";
 
     assert_eq!(last_line, expected_output);
 }
@@ -63,12 +61,11 @@ fn integration_delete_whole_database_query() {
     command.wait().unwrap();
 
     let reader = BufReader::new(File::open(&route_file).unwrap());
+    let _ = std::fs::remove_file(&route_file).unwrap();
 
     let last_line = reader.lines().last().unwrap().unwrap();
 
-    let expected_output = "Nombre,Apellido,Edad,Correo electronico,Profesion";
+    let expected_output = "Id,Nombre,Apellido,Edad,Correo electronico,Profesion";
 
     assert_eq!(last_line, expected_output);
-
-    let _ = std::fs::remove_file(&route_file).unwrap();
 }

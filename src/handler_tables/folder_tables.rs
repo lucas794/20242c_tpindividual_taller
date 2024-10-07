@@ -1,4 +1,6 @@
-use std::{collections::HashMap, fs, io, rc::Rc};
+use std::{collections::HashMap, fs, rc::Rc};
+
+use crate::errors::tperrors::Tperrors;
 
 /// FolderTables is a struct that contains a HashMap
 ///
@@ -8,8 +10,13 @@ pub struct FolderTables {
 }
 
 impl FolderTables {
-    pub fn new(path_folder: &str) -> Result<FolderTables, io::Error> {
-        let folder = fs::read_dir(path_folder)?;
+    pub fn new(path_folder: &str) -> Result<FolderTables, Tperrors> {
+        let folder = match fs::read_dir(path_folder) {
+            Ok(folder) => folder,
+            Err(_) => {
+                return Err(Tperrors::Table("Folder not found".to_string()));
+            }
+        };
 
         let mut temp_hash: HashMap<String, String> = HashMap::new();
 
@@ -37,11 +44,9 @@ impl FolderTables {
             let file_name_ref = Rc::clone(&rc);
             let path = match file_name_ref.path().to_str() {
                 Some(path) => String::from(path),
-                None => Err(io::Error::new(io::ErrorKind::Other, "Invalid path"))?,
+                None => return Err(Tperrors::Table("Invalid path".to_string())),
             };
             temp_hash.insert(file_name, path);
-
-            drop(rc);
         }
         Ok(FolderTables { data: temp_hash })
     }
@@ -68,5 +73,11 @@ mod tests {
             let path = folder.get_path(table);
             assert_eq!(path, Some(format!("./tables/{}.csv", table)));
         }
+    }
+
+    #[test]
+    fn test_folder_invalid_folder_throws_err() {
+        let folder = FolderTables::new("./invalid_folder");
+        assert!(folder.is_err());
     }
 }

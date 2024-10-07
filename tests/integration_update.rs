@@ -4,7 +4,7 @@ use std::{
     process::Command,
 };
 
-mod common;
+pub mod common;
 #[test]
 fn integration_update_simple_query() {
     // create a new file;
@@ -30,12 +30,11 @@ fn integration_update_simple_query() {
 
     // lets read the last line of the file
     let reader = BufReader::new(File::open(&route_file).unwrap());
+    let _ = std::fs::remove_file(&route_file).unwrap();
 
     let last_line = reader.lines().last().unwrap().unwrap();
 
-    let expected_output = "TEST,Hernández,45,phernandez@gmail.com,publicista";
-
-    let _ = std::fs::remove_file(&route_file).unwrap();
+    let expected_output = "10,TEST,Hernández,45,phernandez@gmail.com,publicista";
 
     assert_eq!(last_line, expected_output);
 }
@@ -49,8 +48,6 @@ fn integration_update_all_values_query() {
     let table_name_start = route_file.rfind("/").unwrap() + 1;
     let table_name_end = route_file.rfind(".").unwrap();
     let table_name = &route_file[table_name_start..table_name_end];
-
-    println!("table_name: {}", table_name);
 
     let argument = format!(
         "cargo run -- ./tests \"UPDATE {} SET Nombre = Lucas, Edad = 32;\"",
@@ -66,15 +63,18 @@ fn integration_update_all_values_query() {
     command.wait().unwrap();
     // lets read the last line of the file
     let reader = BufReader::new(File::open(&route_file).unwrap());
+    let _ = std::fs::remove_file(&route_file).unwrap();
+
+    const COLUMN_NAME_INDEX: usize = 1;
+    const COLUMN_AGE_INDEX: usize = 3;
 
     for line in reader.lines().skip(1) {
         // skip headers
         let line = line.unwrap();
-        let name_column = line.split(",").nth(0).unwrap();
-        let age_column = line.split(",").nth(2).unwrap();
+        let name_column = line.split(",").nth(COLUMN_NAME_INDEX).unwrap();
+        let age_column = line.split(",").nth(COLUMN_AGE_INDEX).unwrap();
 
+        // all name, age columns should match lucas,32
         assert_eq!((name_column, age_column), ("Lucas", "32"));
     }
-
-    let _ = std::fs::remove_file(&route_file).unwrap();
 }

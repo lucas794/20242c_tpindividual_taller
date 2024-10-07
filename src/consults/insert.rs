@@ -1,3 +1,5 @@
+use std::io::{Read, Seek};
+
 use crate::errors::tperrors::Tperrors;
 use crate::handler_tables::table::*;
 
@@ -31,9 +33,9 @@ impl Insert {
     }
 
     /// Execute the insert query
-    pub fn execute_insert(
+    pub fn execute_insert<R: Read + Seek>(
         &self,
-        table: &mut Table,
+        table: &mut Table<R>,
         columns: Vec<String>,
         values: Vec<String>,
     ) -> Result<(), Tperrors> {
@@ -42,8 +44,7 @@ impl Insert {
 
         match resolve {
             Ok(line) => {
-                let mut line = line.join(",");
-                line.push('\n');
+                let line = line.join(",");
                 match table.insert_line_to_csv(line) {
                     Ok(_) => Ok(()),
                     Err(_) => Err(Tperrors::Generic("Error while inserting line".to_string())),

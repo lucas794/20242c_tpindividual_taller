@@ -269,6 +269,7 @@ impl Extractor {
                 }
             };
             let conditions = &query[pos + "WHERE".len()..end].trim();
+
             Some(conditions)
         } else {
             // no conditions, but maybe ordered by..
@@ -353,7 +354,7 @@ mod tests {
     }
 
     #[test]
-    fn conditions_multiple_query() {
+    fn conditions_multiple_query_with_spaces() {
         let extractor = Extractor::new();
 
         let vec_query: Vec<&str> = vec![
@@ -365,6 +366,22 @@ mod tests {
         for q in vec_query {
             let conditions = extractor.extract_as_str_conditions(q).unwrap();
             assert_eq!(conditions, "id = 5 AND level = 10");
+        }
+    }
+
+    #[test]
+    fn conditions_multiple_without_spaces() {
+        let extractors = Extractor::new();
+
+        let vec_query: Vec<&str> = vec![
+            "SELECT * FROM users WHERE id=5 AND level=10;",
+            "SELECT * FROM users WHERE id=5 AND level=10 ORDER BY id;",
+            "UPDATE users SET name='John' WHERE id=5 AND level=10;",
+        ];
+
+        for q in vec_query {
+            let conditions = extractors.extract_as_str_conditions(q).unwrap();
+            assert_eq!(conditions, "id=5 AND level=10");
         }
     }
 

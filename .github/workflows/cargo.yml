@@ -17,8 +17,14 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Install Clippy
+      run: rustup component add clippy
+
+    - name: Run cargo clippy
+      run: cargo clippy --all -- -D warnings
+
     - name: fmt check
-      run: cargo fmt --check 
+      run: cargo fmt --all -- --check
     
     - name: Build
       run: cargo build --verbose

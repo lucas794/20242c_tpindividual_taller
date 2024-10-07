@@ -2,7 +2,9 @@ use std::{
     cmp::Ordering,
     collections::HashMap,
     fs::{self, File},
-    io::{BufRead, BufReader, BufWriter, Seek, SeekFrom, Write},
+    io::{BufRead, BufReader, BufWriter, Cursor, Read, Seek, SeekFrom, Write},
+    rc::Rc,
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 use crate::{
@@ -13,32 +15,28 @@ use crate::{
 use crate::errors::fileerrors::*;
 use crate::errors::tperrors::*;
 
-pub struct Table {
+pub struct Table<R: Read + Seek> {
     file_name: String,
-    file: File,
+    reader: BufReader<R>,
 }
 
-// lets implement a comparator to sort a vector
+impl<R: Read + Seek> Table<R> {
+    /// Mock a table with a file name and data
+    ///
+    /// This is used for testing purposes
+    pub fn mock(file_name: String, data: &'static [u8]) -> Table<Cursor<&'static [u8]>> {
+        let cursor = Cursor::new(data as &[u8]);
+        let reader = BufReader::new(cursor);
+        Table { file_name, reader }
+    }
 
-impl Table {
-    pub fn new(path_table: String) -> Result<Self, std::io::Error> {
-        let file_reference = File::open(&path_table);
+    pub fn new(path_table: String) -> Result<Table<File>, std::io::Error> {
+        let file_reference = File::open(&path_table)?;
 
-        match file_reference {
-            Ok(file) => Ok(Table {
-                file,
-                file_name: path_table.to_string(),
-            }),
-            Err(_) => {
-                // lets throw error and stop the program
-                Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "Error opening file",
-                ))
-            }
-        }
-
-        // lets close the file
+        Ok(Table {
+            file_name: path_table,
+            reader: BufReader::new(file_reference),
+        }) // lets close the file
     }
 
     pub fn get_file_directory(&self) -> String {
@@ -89,13 +87,9 @@ impl Table {
         opt_conditions_as_str: Option<&str>,
         vector_sorting: Option<Vec<SortMethod>>,
     ) -> Result<Vec<Vec<String>>, std::io::Error> {
-        // we need to match the index of the columns with the index of the csv
-        // we need to read the csv and get the columns
-        // we need to print the columns
         let columns_from_file = self.get_column_from_file()?;
 
-        // we need to get the columns index, if the column isnt found, throw error
-        // but it may be the joker (*) so we need to handle it
+        // if len is 1 AND the only element is a * (joker) we need to get all the columns
         let index_requested_columns = if columns.len() == 1 && columns[0] == "*" {
             (0..columns_from_file.len()).collect::<Vec<usize>>()
         } else {
@@ -108,243 +102,104 @@ impl Table {
                         .ok_or_else(|| {
                             std::io::Error::new(
                                 std::io::ErrorKind::Other,
-                                format!("Invalid column {} inside the query", c),
+                                format!("Invalid column {} inside the query (not in the file)", c),
                             )
                         })
                 })
                 .collect::<Result<Vec<usize>, std::io::Error>>()?
         };
 
-        self.file.seek(std::io::SeekFrom::Start(0))?; // lets place it after the columns name
         let mut result: Vec<Vec<String>> = Vec::new();
 
-        for line_read in std::io::BufReader::new(&self.file).lines().skip(1) {
-            let line = line_read?;
+        self.reader.seek(SeekFrom::Start(0))?;
+        let reader = &mut self.reader;
+
+        let index_columns = (0..columns_from_file.len()).collect::<Vec<usize>>();
+        for line in reader.by_ref().lines().skip(1) {
+            let line = line?;
             let splitted_line = line.split(",").collect::<Vec<&str>>();
 
             if opt_conditions_as_str.is_some() {
-                // we have conditions to check
-                let (extracted_conditions, line_to_writte) = self.extract_conditions(
-                    &(0..columns_from_file.len()).collect::<Vec<usize>>(),
-                    &splitted_line,
-                    &columns_from_file,
-                );
-
-                // we cut line_to_writte to keep only the index we requested
-                let line_to_writte = index_requested_columns
-                    .iter()
-                    .map(|i| line_to_writte[*i].to_string())
-                    .collect::<Vec<String>>();
-                // now everything is clear and ready to check if conditions are met
+                let (extracted_conditions, _line_to_write) =
+                    Self::extract_conditions(&index_columns, &splitted_line, &columns_from_file);
+                //panic!("Extracted conditions: {:?}", extracted_conditions);
                 let condition = Condition::new(extracted_conditions);
                 let str_conditions = opt_conditions_as_str.unwrap_or("");
 
                 match condition.matches_condition(str_conditions) {
                     Ok(true) => {
-                        result.push(line_to_writte);
+                        result.push(splitted_line.iter().map(|s| s.to_string()).collect());
                     }
-                    Ok(false) => {
-                        // we do nothing
-                    }
+                    Ok(false) => {}
                     Err(e) => {
                         let e = e.to_string();
                         return Err(std::io::Error::new(std::io::ErrorKind::Other, e));
                     }
                 }
             } else {
-                // we need to push the matched columns to the vector
-                let line_to_write = index_requested_columns
-                    .iter()
-                    .map(|i| splitted_line[*i])
-                    .map(|s| s.to_string())
-                    .collect::<Vec<String>>();
-                result.push(line_to_write);
+                result.push(splitted_line.iter().map(|s| s.to_string()).collect());
             }
         }
 
-        if let Some(sorting) = vector_sorting {
-            // first, let check if the columns are valid
-            let columns_from_query = sorting
-                .iter()
-                .map(|method| method.get_by_column())
-                .collect::<Vec<&String>>();
-            if !columns_from_query.iter().all(|c| columns.contains(c)) {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "Invalid columns inside the query",
-                ));
-            }
+        // at this point, i have the result of the query
+        // I need to sort it as needed, and now keep only the columns requested
+        if let Some(vec_sort) = vector_sorting {
+            for sort_method in &vec_sort {
+                let column = sort_method.get_by_column();
+                let index = columns_from_file
+                    .iter()
+                    .position(|c| c == column)
+                    .ok_or_else(|| {
+                        std::io::Error::new(
+                            std::io::ErrorKind::Other,
+                            format!("Invalid column {} inside the query to sort", column),
+                        )
+                    })?;
 
-            // now sorting the vector
-            result.sort_by(|a, b| {
-                for method in &sorting {
-                    let column = method.get_by_column();
-                    let asc = method.is_ascending();
-
-                    let index = columns.iter().position(|c| c == column).unwrap();
+                result.sort_by(|a, b| {
                     let a_value = a[index].as_str();
                     let b_value = b[index].as_str();
 
                     match a_value.cmp(b_value) {
                         Ordering::Less => {
-                            if asc {
-                                return Ordering::Less;
+                            if sort_method.is_ascending() {
+                                Ordering::Less
                             } else {
-                                return Ordering::Greater;
+                                Ordering::Greater
                             }
                         }
                         Ordering::Greater => {
-                            if asc {
-                                return Ordering::Greater;
+                            if sort_method.is_ascending() {
+                                Ordering::Greater
                             } else {
-                                return Ordering::Less;
+                                Ordering::Less
                             }
                         }
-                        Ordering::Equal => {
-                            continue;
-                        }
+                        Ordering::Equal => Ordering::Equal,
                     }
-                }
-                Ordering::Equal
-            });
+                });
+            }
         }
-        // same as line_to_writte, we filter columns_from_file to keep only the requested columns
-        let columns_from_file = index_requested_columns
+
+        // last thing, we filter the columns requested
+        result = result
+            .iter()
+            .map(|line| {
+                index_requested_columns
+                    .iter()
+                    .map(|i| line[*i].to_string())
+                    .collect()
+            })
+            .collect();
+
+        // lets only now keep the headers of the columns requested
+        let header_requested = index_requested_columns
             .iter()
             .map(|i| columns_from_file[*i].to_string())
             .collect::<Vec<String>>();
 
-        result.insert(0, columns_from_file);
+        result.insert(0, header_requested); // we add at the head the columns of the db
         Ok(result)
-        /*
-        let splitted_columns_from_file = match self.get_column_from_file() {
-            Ok(columns) => columns,
-            Err(e) => {
-                return Err(e);
-            }
-        };
-
-        // lets check if its a select *
-        let index_columns = if columns.len() == 1 && columns[0] == "*" {
-            (0..splitted_columns_from_file.len()).collect::<Vec<usize>>()
-        } else {
-            let temp_index = splitted_columns_from_file
-                .iter()
-                .enumerate()
-                .filter(|(_i, c)| columns.contains(&c.to_string()))
-                .map(|(i, _c)| i)
-                .collect::<Vec<usize>>();
-
-            if columns.len() != temp_index.len() {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "Invalid columns inside the query",
-                ));
-            }
-            temp_index
-        };
-
-        let columns = if columns.len() == 1 && columns[0] == "*" {
-            // we need to handle the case if its a joker *
-            splitted_columns_from_file
-                .iter()
-                .map(|s| s.to_string())
-                .collect::<Vec<String>>()
-        } else {
-            columns
-        };
-
-        // and print the columns
-        self.file.seek(std::io::SeekFrom::Start(0))?; // lets place it after the columns name
-        let mut result: Vec<Vec<String>> = Vec::new();
-
-        for line_read in std::io::BufReader::new(&self.file).lines().skip(1) {
-            let line = line_read?;
-            let splitted_line = line.split(",").collect::<Vec<&str>>();
-
-            if opt_conditions_as_str.is_some() {
-                // we have conditions to check
-                let (extracted_conditions, line_to_writte) =
-                    self.extract_conditions(&index_columns, &splitted_line, &columns);
-
-                println!("EC: {:?}", extracted_conditions);
-                // now everything is clear and ready to check if conditions are met
-                let condition = Condition::new(extracted_conditions);
-                let str_conditions = opt_conditions_as_str.unwrap_or("");
-
-                match condition.matches_condition(str_conditions) {
-                    Ok(true) => {
-                        result.push(line_to_writte);
-                    }
-                    Ok(false) => {
-                        // we do nothing
-                    }
-                    Err(e) => {
-                        let e = e.to_string();
-                        return Err(std::io::Error::new(std::io::ErrorKind::Other, e));
-                    }
-                }
-            } else {
-                // we need to push the matched columns to the vector
-                let line_to_write = index_columns
-                    .iter()
-                    .map(|i| splitted_line[*i])
-                    .map(|s| s.to_string())
-                    .collect::<Vec<String>>();
-                result.push(line_to_write);
-            }
-        }
-
-        // lets sort the vector if we have a sorting method..
-        if let Some(sorting) = vector_sorting {
-            // first, let check if the columns are valid
-            let columns_from_query = sorting
-                .iter()
-                .map(|method| method.get_by_column())
-                .collect::<Vec<&String>>();
-            if !columns_from_query.iter().all(|c| columns.contains(c)) {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "Invalid columns inside the query",
-                ));
-            }
-
-            // now sorting the vector
-            result.sort_by(|a, b| {
-                for method in &sorting {
-                    let column = method.get_by_column();
-                    let asc = method.is_ascending();
-
-                    let index = columns.iter().position(|c| c == column).unwrap();
-                    let a_value = a[index].as_str();
-                    let b_value = b[index].as_str();
-
-                    match a_value.cmp(b_value) {
-                        Ordering::Less => {
-                            if asc {
-                                return Ordering::Less;
-                            } else {
-                                return Ordering::Greater;
-                            }
-                        }
-                        Ordering::Greater => {
-                            if asc {
-                                return Ordering::Greater;
-                            } else {
-                                return Ordering::Less;
-                            }
-                        }
-                        Ordering::Equal => {
-                            continue;
-                        }
-                    }
-                }
-                Ordering::Equal
-            });
-        }
-        result.insert(0, columns); // to prevent clone, at the end the columns at the top of the vector.
-
-        Ok(result)*/
     }
 
     /// given a columns and values as Vec of String
@@ -354,7 +209,7 @@ impl Table {
     /// else returns a Error.
     ///
     pub fn resolve_insert(
-        &self,
+        &mut self,
         columns: Vec<String>,
         values: Vec<String>,
     ) -> Result<Vec<String>, std::io::Error> {
@@ -414,13 +269,15 @@ impl Table {
     ///
     /// Given the columns to update, the values to update, and the conditions as str
     ///
-    /// it will return the result of the query
+    /// it will resolve the query, and will return the path to the temporal file
+    ///
+    /// containing the result of the query.
     pub fn resolve_update(
         &mut self,
         columns: Vec<String>,
         values: Vec<String>,
         opt_conditions: Option<&str>,
-    ) -> Result<(), std::io::Error> {
+    ) -> Result<String, std::io::Error> {
         // we need to check if the columns are valid
         let splitted_columns_from_file = match self.get_column_from_file() {
             Ok(columns) => columns,
@@ -463,25 +320,31 @@ impl Table {
         // if it is met, we need to change the values
         // and push it to the result
 
-        self.file.seek(SeekFrom::Start(0))?;
+        self.reader.seek(SeekFrom::Start(0))?;
 
-        // get current path where the file is located
-        let formal_path = format!("{}/temporal_file.csv", self.get_directory_where_file_is());
+        // Situation: We need to create a temporal file to save the data
+        // then change that file to the original file
+        // Test run every test at the same time so they generate the same temp file
+        // if the file is with a constant name, so by that, we do a temporal file with the
+        // usage of the time in microseconds
 
-        let mut temporal_file = BufWriter::new(File::create(formal_path)?);
+        let temporal_file_path = self.generate_temporal_file_path()?;
+        let rc_file_path = Rc::new(temporal_file_path);
+
+        let temporal_file = File::create(rc_file_path.as_ref())?;
+        let mut temporal_file = BufWriter::new(temporal_file);
 
         temporal_file.write_all(splitted_columns_from_file.join(",").as_bytes())?;
-
         temporal_file.write_all("\n".as_bytes())?;
 
-        for line in BufReader::new(&self.file).lines().skip(1) {
+        for line in self.reader.by_ref().lines().skip(1) {
             let line = line?;
             let splitted_line = line.split(",").collect::<Vec<&str>>();
 
             match opt_conditions {
                 Some(str_conditions) => {
                     let splitted_columns_as_string = splitted_columns_from_file.as_slice();
-                    let (vec_conditions, _) = self.extract_conditions(
+                    let (vec_conditions, _) = Self::extract_conditions(
                         &index_all_columns,
                         &splitted_line,
                         splitted_columns_as_string,
@@ -526,7 +389,7 @@ impl Table {
                 }
             }
         }
-        Ok(())
+        Ok(rc_file_path.as_ref().to_string())
     }
 
     /// Helper to extract the conditions from the splitted line
@@ -536,7 +399,6 @@ impl Table {
     /// we return a hash of conditions AND the line itself.
     ///
     fn extract_conditions(
-        &self,
         index_columns: &[usize],
         splitted_line: &[&str],
         columns_from_query: &[String],
@@ -574,11 +436,12 @@ impl Table {
             .append(true)
             .open(&self.file_name)?;
 
+        file.write_all('\n'.to_string().as_bytes())?;
         file.write_all(line.as_bytes())?;
         Ok(())
     }
 
-    pub fn resolve_delete(&mut self, conditions: Option<&str>) -> Result<(), std::io::Error> {
+    pub fn resolve_delete(&mut self, conditions: Option<&str>) -> Result<String, std::io::Error> {
         // we need to check if the conditions are met
         // if they are met, we need to delete the line
         // else we need to keep the line
@@ -593,16 +456,18 @@ impl Table {
         };
         let columns_from_csv = splitted_columns_from_file.join(",");
 
-        self.file.seek(SeekFrom::Start(0))?;
+        self.reader.seek(SeekFrom::Start(0))?;
 
-        let formal_path = format!("{}/temporal_file.csv", self.get_directory_where_file_is());
+        let temporal_file_path = self.generate_temporal_file_path()?;
+        let rc_file_path = Rc::new(temporal_file_path);
 
-        let mut temporal_file = BufWriter::new(File::create(formal_path)?);
+        let temporal_file = File::create(rc_file_path.as_ref())?;
+        let mut temporal_file = BufWriter::new(temporal_file);
 
         temporal_file.write_all(columns_from_csv.as_bytes())?;
         temporal_file.write_all("\n".as_bytes())?;
 
-        for line in BufReader::new(&self.file).lines().skip(1) {
+        for line in self.reader.by_ref().lines().skip(1) {
             let line = line?;
             let splitted_line = line.split(",").collect::<Vec<&str>>();
 
@@ -613,15 +478,13 @@ impl Table {
                         .iter()
                         .map(|s| s.to_string())
                         .collect::<Vec<String>>();
-                    let (hashed_conditions, _) = self.extract_conditions(
-                        &(0..splitted_columns.len()).collect::<Vec<usize>>(),
+
+                    let (extracted_conditions, _line_to_write) = Self::extract_conditions(
+                        &(0..splitted_columns_as_string.len()).collect::<Vec<usize>>(),
                         &splitted_line,
                         &splitted_columns_as_string,
                     );
-                    // lets see all keys and values
-                    let condition = Condition::new(hashed_conditions);
-
-                    // lets see all keys and values
+                    let condition = Condition::new(extracted_conditions);
                     match condition.matches_condition(str_conditions) {
                         Ok(true) => {
                             // critera matches? we do nothing
@@ -646,7 +509,7 @@ impl Table {
             }
         }
 
-        Ok(())
+        Ok(rc_file_path.as_ref().to_string())
     }
 
     /// Returns the directory where the file is located
@@ -656,7 +519,7 @@ impl Table {
         let file_path_pos = self.get_file_directory().rfind('/').unwrap_or(0);
 
         match file_path_pos {
-            0 => "./".to_string(),
+            0 => ".".to_string(),
             _ => self.get_file_directory()[..file_path_pos].to_string(),
         }
     }
@@ -664,35 +527,46 @@ impl Table {
     /// The approach in this work is to avoid reading the whole line on memory.
     /// So, we create a "temp" csv file with the output
     /// Then, at the end, switch names.
-    pub fn replace_original_with_tempfile(&self) -> Result<(), FileErrors> {
+    pub fn replace_original_with(&self, temporal_file: String) -> Result<(), FileErrors> {
         let original_file = self.get_file_directory();
-        let replacement = format!("{}/temporal_file.csv", self.get_directory_where_file_is());
 
         match fs::remove_file(&original_file) {
             Ok(_) => {}
-            Err(_) => {
-                return Err(FileErrors::DeletionFailed);
-            }
+            Err(_) => return Err(FileErrors::DeletionFailed),
         }
 
-        match fs::rename(replacement, &original_file) {
-            Ok(_) => Ok(()),
-            Err(_) => Err(FileErrors::InvalidFile),
+        // now we rename the temporal file to the original file
+        match fs::rename(temporal_file, &original_file) {
+            Ok(_) => {}
+            Err(_) => return Err(FileErrors::InvalidFile),
         }
+        Ok(())
     }
 
     /// gets the columns of the table as string
-    fn get_column_from_file(&self) -> Result<Vec<String>, std::io::Error> {
-        let columns = std::io::BufReader::new(&self.file)
-            .lines()
-            .next()
-            .unwrap_or(Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Error reading file",
-            )))?;
-
-        let splitted_columns = columns.split(",").collect::<Vec<&str>>();
+    fn get_column_from_file(&mut self) -> Result<Vec<String>, std::io::Error> {
+        self.reader.seek(SeekFrom::Start(0))?;
+        let first_column = self.reader.by_ref().lines().next().unwrap()?;
+        let splitted_columns = first_column.split(",").collect::<Vec<&str>>();
         Ok(splitted_columns.iter().map(|s| s.to_string()).collect())
+    }
+
+    fn generate_temporal_file_path(&self) -> Result<String, std::io::Error> {
+        let start = SystemTime::now();
+        let since_the_epoch = match start.duration_since(UNIX_EPOCH) {
+            Ok(time) => time,
+            Err(_) => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "Error getting time",
+                ));
+            }
+        };
+        Ok(format!(
+            "{}/temporal_file_{}.csv",
+            self.get_directory_where_file_is(),
+            since_the_epoch.as_micros()
+        ))
     }
 }
 
@@ -700,9 +574,24 @@ impl Table {
 mod tests {
     use super::*;
 
+    const CSV_DATA: &str = "Id,Nombre,Apellido,Edad,Correo electronico,Profesion\n\
+    1,Juan,Perez,32,jperez@gmail.com,medico\n\
+    2,Maria,Gomez,28,mgomez@gmail.com,abogado\n\
+    3,Carlos,Sánchez,45,csanchez@gmail.com,ingeniero\n\
+    4,Ana,Ruiz,36,aruiz@gmail.com,arquitecta\n\
+    5,Luis,Martínez,29,lmartinez@gmail.com,profesor\n\
+    6,Laura,Domínguez,41,ldominguez@gmail.com,enfermera\n\
+    7,Pedro,Fernández,33,pfernandez@gmail.com,diseñador\n\
+    8,Lucía,Ramos,26,lramos@gmail.com,psicóloga\n\
+    9,Diego,Navarro,39,dnavarro@gmail.com,empresario\n\
+    10,Paula,Hernández,31,phernandez@gmail.com,publicista\n\
+    11,Andrés,García,34,andresgarcia@gmail.com,contador y ingeniero\n\
+    ";
+
     #[test]
     fn new() {
-        let table = Table::new("./tests/data/database.csv".to_string()).unwrap();
+        let table = Table::<Cursor<&[u8]>>::mock("database".to_string(), CSV_DATA.as_bytes());
+        //let table = Table::<File>::new("./tests/data/database.csv".to_string()).unwrap();
         let filename = table.get_file_name().unwrap();
         assert_eq!(filename, "database");
     }
@@ -712,14 +601,14 @@ mod tests {
         let invalid_routes = vec!["./invalidtable.csv", "./invalidtable"];
 
         for invalid_route in invalid_routes {
-            let table = Table::new(invalid_route.to_string());
+            let table = Table::<File>::new(invalid_route.to_string());
             assert_eq!(table.is_err(), true);
         }
     }
 
     #[test]
     fn invalid_column() {
-        let mut table = Table::new("./tests/data/database.csv".to_string()).unwrap();
+        let mut table = Table::<Cursor<&[u8]>>::mock("database".to_string(), CSV_DATA.as_bytes());
 
         // tesis is the invalid columns
         let columns = vec!["Edad".to_string(), "Tesis".to_string()];
@@ -730,7 +619,7 @@ mod tests {
 
     #[test]
     fn invalid_column_when_sorting() {
-        let mut table = Table::new("./tests/data/database.csv".to_string()).unwrap();
+        let mut table = Table::<Cursor<&[u8]>>::mock("database".to_string(), CSV_DATA.as_bytes());
 
         // tesis is the invalid columns
         let columns = vec!["Nombre".to_string(), "Edad".to_string()];
@@ -738,32 +627,33 @@ mod tests {
         let conditions: Option<&str> = None;
 
         let sorting = Some(vec![SortMethod {
-            by_column: "Profesion".to_string(),
+            by_column: "Trabajo Profesional".to_string(),
             ascending: true,
         }]);
 
         // at t his point, we have this consult.
-        // SELECT Nombre, Edad FROM test ORDER BY Profesion;
+        // SELECT Nombre, Edad FROM test ORDER BY Trabajo Profesional;
         // so we are trying to sort by a column that does not exist
         let result = table.resolve_select(columns, conditions, sorting);
         assert_eq!(result.is_err(), true);
     }
 
     #[test]
-    fn return_select_returns_ok() {
-        let mut table = Table::new("./tests/data/database.csv".to_string()).unwrap();
+    fn test_select_returns_ok() {
+        let mut table = Table::<Cursor<&[u8]>>::mock("database".to_string(), CSV_DATA.as_bytes());
 
         let columns = vec!["Nombre".to_string(), "Edad".to_string()];
         let result = table.resolve_select(columns, None, None);
+        println!("{:?}", result);
         assert_eq!(result.is_ok(), true);
     }
 
     #[test]
-    fn return_select_returns_ok_with_conditions() {
-        let mut table = Table::new("./tests/data/database.csv".to_string()).unwrap();
+    fn test_select_returns_ok_with_conditions() {
+        let mut table = Table::<Cursor<&[u8]>>::mock("database".to_string(), CSV_DATA.as_bytes());
 
         let columns = vec!["Nombre".to_string(), "Edad".to_string()];
-        let conditions = Some("Nombre = 'Luis' AND Edad = 29");
+        let conditions = Some("Nombre = 'Luis' AND Edad>15");
         let result = table.resolve_select(columns, conditions, None).unwrap();
 
         let expected_result = vec![
@@ -775,11 +665,11 @@ mod tests {
     }
 
     #[test]
-    fn return_select_returns_proper_order_of_requested_columns() {
+    fn test_select_returns_proper_order_of_requested_columns() {
         // I'm trying to do a SELECT Edad, Nombre FROM table WHERE Edad = 45;
         // Edad = 45 only to get one result.
 
-        let mut table = Table::new("./tests/data/database.csv".to_string()).unwrap();
+        let mut table = Table::<Cursor<&[u8]>>::mock("database".to_string(), CSV_DATA.as_bytes());
         let columns = vec!["Edad".to_string(), "Nombre".to_string()];
         let conditions = Some("Edad = 45");
         let sorting = None;
@@ -798,11 +688,11 @@ mod tests {
         }
     }
     #[test]
-    fn return_select_returns_proper_answer_without_passing_the_column_as_query() {
+    fn test_select_returns_proper_answer_without_passing_the_column_as_query() {
         // I'm trying to do a SELECT Nombre FROM table WHERE Edad = 45;
         // So i'm going to get only Carlos as result.
 
-        let mut table = Table::new("./tests/data/database.csv".to_string()).unwrap();
+        let mut table = Table::<Cursor<&[u8]>>::mock("database".to_string(), CSV_DATA.as_bytes());
         let columns = vec!["Nombre".to_string()];
         let conditions = Some("Edad = 45");
         let sorting = None;
@@ -819,11 +709,11 @@ mod tests {
     }
 
     #[test]
-    fn return_select_returns_proper_answer_with_column_with_spaces() {
+    fn test_select_returns_proper_answer_with_column_with_spaces() {
         // I'm trying to do a SELECT \"Correo electronico\" FROM table WHERE Edad = 45;
         // So i'm going to get only csanchez@gmail.com as result.
 
-        let mut table = Table::new("./tests/data/database.csv".to_string()).unwrap();
+        let mut table = Table::<Cursor<&[u8]>>::mock("database".to_string(), CSV_DATA.as_bytes());
         let columns = vec!["Correo electronico".to_string()];
         let conditions = Some("Edad = 45");
         let sorting = None;
@@ -842,8 +732,8 @@ mod tests {
         }
     }
     #[test]
-    fn return_select_returns_ok_with_nested_parenthesis_condition() {
-        let mut table = Table::new("./tests/data/database.csv".to_string()).unwrap();
+    fn test_select_returns_ok_with_nested_parenthesis_condition() {
+        let mut table = Table::<Cursor<&[u8]>>::mock("database".to_string(), CSV_DATA.as_bytes());
 
         let columns = vec!["Nombre".to_string(), "Profesion".to_string()];
         let conditions = Some("(Edad >= 32 AND Edad <= 40) AND (Nombre = Juan OR Nombre = Pedro)");
@@ -855,6 +745,118 @@ mod tests {
             vec!["Pedro".to_string(), "diseñador".to_string()],
         ];
 
-        assert_eq!(result, expected_result);
+        for (i, line) in result.iter().enumerate() {
+            assert_eq!(line, &expected_result[i]);
+        }
+    }
+
+    #[test]
+    fn test_select_returns_ok_with_conditions_attached() {
+        // We are trying to simulate a
+        // SELECT Nombre, Edad FROM clientes WHERE Edad>=45 AND Edad<=43;
+        let mut table = Table::<Cursor<&[u8]>>::mock("database".to_string(), CSV_DATA.as_bytes());
+
+        let columns = vec!["Nombre".to_string(), "Edad".to_string()]; // SELECT ALL
+        let conditions = Some("Edad>=41 AND Edad<=43");
+        let result = table.resolve_select(columns, conditions, None).unwrap();
+
+        let expected_result = vec![
+            vec!["Nombre".to_string(), "Edad".to_string()],
+            vec!["Laura".to_string(), "41".to_string()],
+        ];
+
+        for (i, line) in result.iter().enumerate() {
+            assert_eq!(line, &expected_result[i]);
+        }
+    }
+
+    #[test]
+    fn test_select_returns_ok_with_conditions_attached_desbalanced() {
+        // We are trying to simulate a
+        // SELECT Nombre, Edad FROM clientes WHERE Edad>=45 AND Edad <= 43;
+        // conditions are desbalanced and separated, it should work anyway
+        let mut table = Table::<Cursor<&[u8]>>::mock("database".to_string(), CSV_DATA.as_bytes());
+
+        let columns = vec!["Nombre".to_string(), "Edad".to_string()]; // SELECT ALL
+        let conditions = Some("Edad>=41 AND Edad <= 43");
+        let result = table.resolve_select(columns, conditions, None).unwrap();
+
+        let expected_result = vec![
+            vec!["Nombre".to_string(), "Edad".to_string()],
+            vec!["Laura".to_string(), "41".to_string()],
+        ];
+
+        for (i, line) in result.iter().enumerate() {
+            assert_eq!(line, &expected_result[i]);
+        }
+    }
+
+    #[test]
+    fn test_select_general_column_sorting_without_a_column_presents_in_the_query_returns_ok() {
+        // We are trying to simulate a
+        // SELECT * FROM clientes ORDER BY nombre ASC;
+        // So we're trying to sort by a column that is not present in the query.
+        let mut table = Table::<Cursor<&[u8]>>::mock("database".to_string(), CSV_DATA.as_bytes());
+
+        let column = vec!["*".to_string()];
+
+        let ordering = Some(vec![SortMethod {
+            by_column: "Nombre".to_string(),
+            ascending: true,
+        }]);
+
+        let result = table.resolve_select(column, None, ordering);
+
+        assert_eq!(result.is_ok(), true);
+    }
+
+    #[test]
+    fn test_select_certain_column_not_present_in_query_and_sort_with_other_returns_ok() {
+        // Trying to do
+        // SELECT apellido FROM clientes ORDER BY nombre DESC;
+        let mut table = Table::<Cursor<&[u8]>>::mock("database".to_string(), CSV_DATA.as_bytes());
+
+        let column = vec!["Apellido".to_string()];
+        let ordering = Some(vec![SortMethod {
+            by_column: "Nombre".to_string(),
+            ascending: false,
+        }]);
+
+        let result = table.resolve_select(column, None, ordering);
+        assert_eq!(result.is_ok(), true);
+    }
+    #[test]
+    fn test_select_without_finishing_condition_operator_throws_err() {
+        // We are trying to simulate a
+        // SELECT * FROM clientes WHERE Edad = 45 AND;
+        // So we are trying to finish the condition with an operator.
+        let mut table = Table::<Cursor<&[u8]>>::mock("database".to_string(), CSV_DATA.as_bytes());
+
+        let column = vec!["*".to_string()];
+        let conditions = Some("Edad = 45 AND");
+        let result = table.resolve_select(column, conditions, None);
+
+        assert_eq!(result.is_err(), true);
+    }
+
+    #[test]
+    fn test_select_with_values_as_scaped_value_returns_ok() {
+        // We are trying to simulate a
+        // SELECT * FROM clientes WHERE Profesion = 'contador + ingeniero';
+        // So we are trying to scape the value of the condition.
+        let mut table = Table::<Cursor<&[u8]>>::mock("database".to_string(), CSV_DATA.as_bytes());
+
+        let column = vec!["Nombre".to_string(), "Edad".to_string()];
+        let conditions = Some("Profesion = 'contador y ingeniero'");
+        let result = table.resolve_select(column, conditions, None).unwrap();
+
+        let expected_result = vec![
+            vec!["Nombre".to_string(), "Edad".to_string()],
+            vec!["Andrés".to_string(), "34".to_string()],
+        ];
+
+        for (i, line) in result.iter().enumerate() {
+            assert_eq!(line, &expected_result[i]);
+        }
     }
 }

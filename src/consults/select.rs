@@ -1,3 +1,5 @@
+use std::io::{Read, Seek};
+
 use crate::errors::tperrors::*;
 use crate::handler_tables::table::*;
 use crate::sorter::sort::SortMethod;
@@ -36,9 +38,9 @@ impl Select {
     ///
     /// Returns ok if the query was executed successfully
     ///
-    pub fn execute_select(
+    pub fn execute_select<R: Read + Seek>(
         &self,
-        table: &mut Table,
+        table: &mut Table<R>,
         columns: Vec<String>,
         conditions: Option<&str>,
         sorting_method: Option<Vec<SortMethod>>,
@@ -73,6 +75,8 @@ impl Select {
 
 #[cfg(test)]
 mod tests {
+    use std::fs::File;
+
     use super::*;
 
     #[test]
@@ -90,7 +94,7 @@ mod tests {
 
     #[test]
     fn execute_select_fails_with_invalid_columns() {
-        let mut table = Table::new("./tests/data/database.csv".to_string()).unwrap();
+        let mut table = Table::<File>::new("./tests/data/database.csv".to_string()).unwrap();
         let select = Select::new();
         // i'm trying to select a column that does not exist
         let columns = vec!["Trabajo Profesional".to_string()];

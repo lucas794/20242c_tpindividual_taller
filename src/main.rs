@@ -1,3 +1,5 @@
+use std::fs::File;
+
 use tp_individual::{
     consults::{delete::Delete, insert::Insert, select::Select, update::Update},
     errors::tperrors::Tperrors,
@@ -12,7 +14,7 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
 
     if let Err(e) = run(args) {
-        eprintln!("{}", e);
+        println!("{}", e);
     }
 }
 
@@ -37,10 +39,12 @@ fn run(args: Vec<String>) -> Result<(), Tperrors> {
     let file = &args[1];
     let consult = &args[2].trim();
 
-    let folder_tables = FolderTables::new(file).unwrap_or_else(|e| {
-        eprintln!("{}", e);
-        std::process::exit(1);
-    });
+    let folder_tables = match FolderTables::new(file) {
+        Ok(folder_tables) => folder_tables,
+        Err(e) => {
+            return Err(Tperrors::Table(e.to_string()));
+        }
+    };
 
     let splitted_consult = consult.split(" ").collect::<Vec<&str>>();
     let command = splitted_consult[0];
@@ -50,6 +54,12 @@ fn run(args: Vec<String>) -> Result<(), Tperrors> {
     match command {
         "SELECT" => {
             let select = Select;
+
+            if !select.is_valid_query(consult) {
+                return Err(Tperrors::Syntax(
+                    "Invalid select query (Missing either SELECT , FROM or ;)".to_string(),
+                ));
+            }
 
             match resolve_select(&extractor, folder_tables, consult, select) {
                 Ok(_) => {}
@@ -61,6 +71,12 @@ fn run(args: Vec<String>) -> Result<(), Tperrors> {
         "INSERT" => {
             let insert = Insert;
 
+            if !insert.is_valid_query(consult) {
+                return Err(Tperrors::Syntax(
+                    "Invalid insert query (Missing either INSERT INTO, VALUES or ;)".to_string(),
+                ));
+            }
+
             match resolve_insert(&extractor, folder_tables, consult, insert) {
                 Ok(_) => {}
                 Err(e) => {
@@ -71,6 +87,12 @@ fn run(args: Vec<String>) -> Result<(), Tperrors> {
         "UPDATE" => {
             let update = Update;
 
+            if !update.is_valid_query(consult) {
+                return Err(Tperrors::Syntax(
+                    "Invalid update query (Missing either UPDATE, SET, WHERE or ;)".to_string(),
+                ));
+            }
+
             match resolve_update(&extractor, folder_tables, consult, update) {
                 Ok(_) => {}
                 Err(e) => {
@@ -80,6 +102,12 @@ fn run(args: Vec<String>) -> Result<(), Tperrors> {
         }
         "DELETE" => {
             let delete = Delete;
+
+            if !delete.is_valid_query(consult) {
+                return Err(Tperrors::Syntax(
+                    "Invalid delete query (Missing either DELETE, FROM, WHERE or ;)".to_string(),
+                ));
+            }
 
             match resolve_delete(&extractor, folder_tables, consult, delete) {
                 Ok(_) => {}
@@ -105,7 +133,7 @@ fn return_proper_table_to_work_with(
     folder_tables: FolderTables,
     consult: &str,
     command: SQLCommand,
-) -> Result<Table, Tperrors> {
+) -> Result<Table<File>, Tperrors> {
     let extracted_table_name = match extractor.extract_table(consult, command) {
         Ok(table_name) => table_name,
         Err(e) => {
@@ -113,12 +141,13 @@ fn return_proper_table_to_work_with(
         }
     };
 
-    let table: Table = match folder_tables.get_path(extracted_table_name) {
-        Some(table_path) => Table::new(table_path).unwrap_or_else(|e| {
-            eprintln!("{}", e);
-            std::process::exit(1);
-        }),
-
+    let table: Table<File> = match folder_tables.get_path(extracted_table_name) {
+        Some(table_path) => match Table::<File>::new(table_path) {
+            Ok(table) => table,
+            Err(e) => {
+                return Err(Tperrors::Table(e.to_string()));
+            }
+        },
         None => {
             return Err(Tperrors::Table("Table not found in the folder".to_string()));
         }
@@ -151,6 +180,12 @@ fn resolve_select(
 
     // Conditions of the query (if they exists)
     let conditions = extractor.extract_as_str_conditions(consult);
+
+    if let Some(c) = conditions {
+        if c.is_empty() {
+            return Err(Tperrors::Syntax("incomplete input".to_string()));
+        }
+    }
 
     // Sorting method (if existst)
     let sorting_vector = match extractor.extract_orderby_as_str(consult) {
@@ -222,6 +257,7 @@ fn resolve_delete(
 ) -> Result<(), Tperrors> {
     let mut table =
         return_proper_table_to_work_with(extractor, folder_tables, consult, SQLCommand::Delete)?;
+
     if !delete.is_valid_query(consult) {
         return Err(Tperrors::Syntax(
             "Invalid delete query (Missing either DELETE, FROM, WHERE or ;)".to_string(),
