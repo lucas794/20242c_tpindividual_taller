@@ -3,7 +3,6 @@ use std::{
     collections::HashMap,
     fs::{self, File},
     io::{BufRead, BufReader, BufWriter, Cursor, Read, Seek, SeekFrom, Write},
-    rc::Rc,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -265,19 +264,20 @@ impl<R: Read + Seek> Table<R> {
         Ok(line_to_write)
     }
 
-    /// Function that handles the resolve of the update query
+    /// Private function that handles
     ///
     /// Given the columns to update, the values to update, and the conditions as str
     ///
-    /// it will resolve the query, and will return the path to the temporal file
+    /// it will resolve the query, if ok it will return Ok() else it will throw an error
     ///
     /// containing the result of the query.
-    pub fn resolve_update(
+    fn resolve_update<W: Write>(
         &mut self,
         columns: Vec<String>,
         values: Vec<String>,
         opt_conditions: Option<&str>,
-    ) -> Result<String, std::io::Error> {
+        file_to_write: W, // its either a Cursor o a File as temp
+    ) -> Result<(), std::io::Error> {
         // we need to check if the columns are valid
         let splitted_columns_from_file = match self.get_column_from_file() {
             Ok(columns) => columns,
@@ -316,23 +316,9 @@ impl<R: Read + Seek> Table<R> {
             }
         }
 
-        // now we need to read the line and check if condition is met
-        // if it is met, we need to change the values
-        // and push it to the result
-
         self.reader.seek(SeekFrom::Start(0))?;
 
-        // Situation: We need to create a temporal file to save the data
-        // then change that file to the original file
-        // Test run every test at the same time so they generate the same temp file
-        // if the file is with a constant name, so by that, we do a temporal file with the
-        // usage of the time in microseconds
-
-        let temporal_file_path = self.generate_temporal_file_path()?;
-        let rc_file_path = Rc::new(temporal_file_path);
-
-        let temporal_file = File::create(rc_file_path.as_ref())?;
-        let mut temporal_file = BufWriter::new(temporal_file);
+        let mut temporal_file = BufWriter::new(file_to_write);
 
         temporal_file.write_all(splitted_columns_from_file.join(",").as_bytes())?;
         temporal_file.write_all("\n".as_bytes())?;
@@ -389,7 +375,41 @@ impl<R: Read + Seek> Table<R> {
                 }
             }
         }
-        Ok(rc_file_path.as_ref().to_string())
+        temporal_file.flush()?;
+        Ok(())
+    }
+
+    /// Function to resolve the update query
+    ///
+    /// Under a file path, it will resolve the update query
+    ///
+    /// It will return the path of the temporal file to make later make the switch
+    ///
+    pub fn resolve_update_for_file(
+        &mut self,
+        columns: Vec<String>,
+        values: Vec<String>,
+        opt_conditions: Option<&str>,
+    ) -> Result<String, std::io::Error> {
+        let temporal_file_path = self.generate_temporal_file_path()?;
+        let temporal_file = File::create(&temporal_file_path)?;
+        self.resolve_update(columns, values, opt_conditions, temporal_file)?;
+        Ok(temporal_file_path)
+    }
+
+    pub fn resolve_update_mock(
+        &mut self,
+        columns: Vec<String>,
+        values: Vec<String>,
+        opt_conditions: Option<&str>,
+    ) -> Result<BufReader<Cursor<Vec<u8>>>, std::io::Error> {
+        let cursor = Cursor::new(Vec::new());
+        let mut writer = BufWriter::new(cursor);
+
+        self.resolve_update(columns, values, opt_conditions, &mut writer)?;
+
+        let inner_buffer = writer.into_inner()?.into_inner();
+        Ok(BufReader::new(Cursor::new(inner_buffer)))
     }
 
     /// Helper to extract the conditions from the splitted line
@@ -441,7 +461,18 @@ impl<R: Read + Seek> Table<R> {
         Ok(())
     }
 
-    pub fn resolve_delete(&mut self, conditions: Option<&str>) -> Result<String, std::io::Error> {
+    /// Internal function that resolves a delete operatior
+    ///
+    /// given a condition and a writter (file or cursor)
+    ///
+    /// it will write the result on the writer and return Ok() if everything is ok
+    ///
+    /// If it fails it will throw a error from std::io::Error
+    fn resolve_delete<W: Write>(
+        &mut self,
+        conditions: Option<&str>,
+        file: W,
+    ) -> Result<(), std::io::Error> {
         // we need to check if the conditions are met
         // if they are met, we need to delete the line
         // else we need to keep the line
@@ -458,11 +489,7 @@ impl<R: Read + Seek> Table<R> {
 
         self.reader.seek(SeekFrom::Start(0))?;
 
-        let temporal_file_path = self.generate_temporal_file_path()?;
-        let rc_file_path = Rc::new(temporal_file_path);
-
-        let temporal_file = File::create(rc_file_path.as_ref())?;
-        let mut temporal_file = BufWriter::new(temporal_file);
+        let mut temporal_file = BufWriter::new(file);
 
         temporal_file.write_all(columns_from_csv.as_bytes())?;
         temporal_file.write_all("\n".as_bytes())?;
@@ -508,8 +535,41 @@ impl<R: Read + Seek> Table<R> {
                 }
             }
         }
+        temporal_file.flush()?;
+        Ok(())
+    }
 
-        Ok(rc_file_path.as_ref().to_string())
+    /// Function that resolves the delete query
+    ///
+    /// Given a condition, it will return the path of the temporal file
+    ///
+    /// If it fails it will throw a error from std::io::Error
+    pub fn resolve_delete_for_file(
+        &mut self,
+        conditions: Option<&str>,
+    ) -> Result<String, std::io::Error> {
+        let temporal_file_path = self.generate_temporal_file_path()?;
+        let temporal_file = File::create(&temporal_file_path)?;
+        self.resolve_delete(conditions, temporal_file)?;
+        Ok(temporal_file_path)
+    }
+
+    /// Mock function that resolves the delete query
+    ///
+    /// Given a condition, it will return a BufReader with the result of the query
+    ///
+    /// If it fails it will throw a error from std::io::Error
+    pub fn resolve_delete_mock(
+        &mut self,
+        conditions: Option<&str>,
+    ) -> Result<BufReader<Cursor<Vec<u8>>>, std::io::Error> {
+        let cursor = Cursor::new(Vec::new());
+        let mut writer = BufWriter::new(cursor);
+
+        self.resolve_delete(conditions, &mut writer)?;
+
+        let inner_buffer = writer.into_inner()?.into_inner();
+        Ok(BufReader::new(Cursor::new(inner_buffer)))
     }
 
     /// Returns the directory where the file is located
@@ -551,7 +611,7 @@ impl<R: Read + Seek> Table<R> {
         Ok(splitted_columns.iter().map(|s| s.to_string()).collect())
     }
 
-    fn generate_temporal_file_path(&self) -> Result<String, std::io::Error> {
+    pub fn generate_temporal_file_path(&self) -> Result<String, std::io::Error> {
         let start = SystemTime::now();
         let since_the_epoch = match start.duration_since(UNIX_EPOCH) {
             Ok(time) => time,
@@ -825,6 +885,7 @@ mod tests {
         let result = table.resolve_select(column, None, ordering);
         assert_eq!(result.is_ok(), true);
     }
+
     #[test]
     fn test_select_without_finishing_condition_operator_throws_err() {
         // We are trying to simulate a
@@ -833,7 +894,7 @@ mod tests {
         let mut table = Table::<Cursor<&[u8]>>::mock("database".to_string(), CSV_DATA.as_bytes());
 
         let column = vec!["*".to_string()];
-        let conditions = Some("Edad = 45 AND");
+        let conditions = Some("Edad=45 AND");
         let result = table.resolve_select(column, conditions, None);
 
         assert_eq!(result.is_err(), true);
@@ -847,7 +908,7 @@ mod tests {
         let mut table = Table::<Cursor<&[u8]>>::mock("database".to_string(), CSV_DATA.as_bytes());
 
         let column = vec!["Nombre".to_string(), "Edad".to_string()];
-        let conditions = Some("Profesion = 'contador y ingeniero'");
+        let conditions = Some("Profesion='contador y ingeniero'");
         let result = table.resolve_select(column, conditions, None).unwrap();
 
         let expected_result = vec![
