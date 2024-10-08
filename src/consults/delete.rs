@@ -1,4 +1,4 @@
-use std::io::{Read, Seek};
+use std::io::{BufReader, Cursor, Read, Seek};
 
 use crate::errors::{fileerrors::FileErrors, tperrors::Tperrors};
 use crate::handler_tables::table::Table;
@@ -28,14 +28,13 @@ impl Delete {
         }
         false
     }
-
     /// Execute the delete query
     pub fn execute_delete<R: Read + Seek>(
         &self,
         table: &mut Table<R>,
         conditions: Option<&str>,
     ) -> Result<(), Tperrors> {
-        let resolve = table.resolve_delete(conditions);
+        let resolve = table.resolve_delete_for_file(conditions);
         match resolve {
             Ok(temp_file_dir) => {
                 match table.replace_original_with(temp_file_dir) {
@@ -68,6 +67,37 @@ impl Delete {
             }
         }
     }
+
+    /// Execute the delete query
+    ///
+    /// This function is used for testing purposes only.
+    ///
+    /// It will return a BufReader<Cursor<Vec<u8>>> with the content of the file.
+    pub fn execute_delete_mock<R: Read + Seek>(
+        &self,
+        table: &mut Table<R>,
+        conditions: Option<&str>,
+    ) -> Result<BufReader<Cursor<Vec<u8>>>, Tperrors> {
+        let resolve = table.resolve_delete_mock(conditions);
+
+        match resolve {
+            Ok(b) => Ok(b),
+            Err(e) => {
+                let formatted_error = format!("{}", e);
+                let dots = formatted_error.find(":").unwrap_or_default();
+                if formatted_error.contains("SYNTAX") {
+                    let formatted_error = formatted_error[dots..].trim().to_string();
+                    Err(Tperrors::Syntax(formatted_error))
+                } else if formatted_error.contains("COLUMN") {
+                    let formatted_error = formatted_error[dots..].trim().to_string();
+                    Err(Tperrors::Table(formatted_error))
+                } else {
+                    let formatted_error = formatted_error[dots..].trim().to_string();
+                    Err(Tperrors::Generic(formatted_error))
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -76,7 +106,7 @@ mod tests {
 
     #[test]
     fn test_is_valid_query() {
-        let delete = Delete::new();
+        let delete = Delete;
         let query = "DELETE FROM table;";
         assert_eq!(delete.is_valid_query(query), true);
 

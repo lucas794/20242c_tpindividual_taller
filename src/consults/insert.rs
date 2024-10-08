@@ -66,6 +66,34 @@ impl Insert {
             }
         }
     }
+
+    pub fn execute_insert_mock<R: Read + Seek>(
+        &self,
+        table: &mut Table<R>,
+        columns: Vec<String>,
+        values: Vec<String>,
+    ) -> Result<String, Tperrors> {
+        // we need to check if the columns are valid
+        let resolve = table.resolve_insert(columns, values);
+
+        match resolve {
+            Ok(line) => Ok(line.join(",")),
+            Err(e) => {
+                let formatted_error = format!("{}", e);
+                let dots = formatted_error.find(":").unwrap_or_default();
+                if formatted_error.contains("SYNTAX") {
+                    let formatted_error = formatted_error[dots..].trim().to_string();
+                    Err(Tperrors::Syntax(formatted_error))
+                } else if formatted_error.contains("COLUMN") {
+                    let formatted_error = formatted_error[dots..].trim().to_string();
+                    Err(Tperrors::Table(formatted_error))
+                } else {
+                    let formatted_error = formatted_error[dots..].trim().to_string();
+                    Err(Tperrors::Generic(formatted_error))
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -74,7 +102,7 @@ mod tests {
 
     #[test]
     fn test_is_valid_query() {
-        let insert = Insert::new();
+        let insert = Insert;
         let query = "INSERT INTO table VALUES ('Juan', 20);";
         assert_eq!(insert.is_valid_query(query), true);
 

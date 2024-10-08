@@ -71,6 +71,33 @@ impl Select {
             }
         }
     }
+    pub fn execute_select_mock<R: Read + Seek>(
+        &self,
+        table: &mut Table<R>,
+        columns: Vec<String>,
+        conditions: Option<&str>,
+        sorting_method: Option<Vec<SortMethod>>,
+    ) -> Result<Vec<Vec<String>>, Tperrors> {
+        let csv_data = table.resolve_select(columns, conditions, sorting_method);
+
+        match csv_data {
+            Ok(data) => Ok(data),
+            Err(e) => {
+                let formatted_error = format!("{}", e);
+                let dots = formatted_error.find(":").unwrap_or_default();
+                if formatted_error.contains("SYNTAX") {
+                    let formatted_error = formatted_error[dots..].trim().to_string();
+                    Err(Tperrors::Syntax(formatted_error))
+                } else if formatted_error.contains("COLUMN") {
+                    let formatted_error = formatted_error[dots..].trim().to_string();
+                    Err(Tperrors::Table(formatted_error))
+                } else {
+                    let formatted_error = formatted_error[dots..].trim().to_string();
+                    Err(Tperrors::Generic(formatted_error))
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -86,6 +113,7 @@ mod tests {
             "name, age FROM table",    // missing select
             "SELECT name, age table;", // missing a coma
             "SELECT name, age",        // missing FROM
+            "name, age FROM",          // missing table name
         ]);
         for invalid_query in invalid_consults {
             assert_eq!(select.is_valid_query(invalid_query), false);

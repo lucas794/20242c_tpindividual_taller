@@ -1,4 +1,4 @@
-use std::io::{Read, Seek};
+use std::io::{BufReader, Cursor, Read, Seek};
 
 use crate::errors::fileerrors::*;
 use crate::errors::tperrors::Tperrors;
@@ -49,7 +49,7 @@ impl Update {
         values: Vec<String>,
         conditions: Option<&str>,
     ) -> Result<(), Tperrors> {
-        let resolve = table.resolve_update(columns, values, conditions);
+        let resolve = table.resolve_update_for_file(columns, values, conditions);
 
         match resolve {
             Ok(temporal_directory_filename) => {
@@ -69,6 +69,41 @@ impl Update {
 
                 Ok(())
             }
+            Err(e) => {
+                let formatted_error = format!("{}", e);
+                let dots = formatted_error.find(":").unwrap_or_default();
+                if formatted_error.contains("SYNTAX") {
+                    let formatted_error = formatted_error[dots..].trim().to_string();
+                    Err(Tperrors::Syntax(formatted_error))
+                } else if formatted_error.contains("COLUMN") {
+                    let formatted_error = formatted_error[dots..].trim().to_string();
+                    Err(Tperrors::Table(formatted_error))
+                } else {
+                    let formatted_error = formatted_error[dots..].trim().to_string();
+                    Err(Tperrors::Generic(formatted_error))
+                }
+            }
+        }
+    }
+
+    /// Function that will execute the update query for the mock table
+    ///
+    /// Uses the same arguments as the normal execute_update function
+    ///
+    /// The difference is that this function will return a BufReader<Cursor<Vec<u8>>>
+    ///
+    /// This is because the mock table is not a file, so we need to return the data in a different way
+    pub fn execute_update_mock<R: Read + Seek>(
+        &self,
+        table: &mut Table<R>,
+        columns: Vec<String>,
+        values: Vec<String>,
+        conditions: Option<&str>,
+    ) -> Result<BufReader<Cursor<Vec<u8>>>, Tperrors> {
+        let resolve = table.resolve_update_mock(columns, values, conditions);
+
+        match resolve {
+            Ok(buf) => Ok(buf),
             Err(e) => {
                 let formatted_error = format!("{}", e);
                 let dots = formatted_error.find(":").unwrap_or_default();
