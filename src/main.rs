@@ -268,3 +268,22 @@ fn resolve_delete(
 
     delete.execute_delete(&mut table, conditions)
 }
+
+#[test]
+fn run_with_invalid_number_of_args() {
+    let args = vec!["".to_string()];
+    let result = run(args);
+    assert_eq!(result.is_err(), true);
+}
+
+#[test]
+fn run_invalid_table_throws_error() {
+    let args = vec![
+        "".to_string(),
+        "SELECT * FROM table;".to_string(),
+        "table".to_string(),
+    ];
+    let result = run(args);
+
+    assert_eq!(result.is_err(), true);
+}
