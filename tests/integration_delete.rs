@@ -1,71 +1,59 @@
-use std::{
-    fs::File,
-    io::{BufRead, BufReader},
-    process::Command,
+use std::io::{BufRead, Cursor};
+
+use tp_individual::{
+    consults::delete::Delete, errors::tperrors::Tperrors, handler_tables::table::Table,
 };
 
 pub mod common;
 
 #[test]
-fn integration_delete_paula_from_database() {
-    // paula is at the last position of the database
-    // create a new file;
-    let route_file = format!("./tests/delete_query_deletion_paula.csv");
-    common::setup(&route_file);
+fn integration_delete_paula_from_database() -> Result<(), Tperrors> {
+    // paula is the last entry on our mock file.
+    let file_name = String::from("delete_query_deletion_paula");
+    let delete = Delete;
+    let mut table = Table::<Cursor<&[u8]>>::mock(file_name, common::csv_data_as_bytes());
+    let condition = Some("Nombre=Paula");
 
-    let table_name_start = route_file.rfind("/").unwrap() + 1;
-    let table_name_end = route_file.rfind(".").unwrap();
-    let table_name = &route_file[table_name_start..table_name_end];
+    match delete.execute_delete_mock(&mut table, condition) {
+        Ok(mocked_file) => {
+            let last_line = mocked_file.lines().last().unwrap().unwrap();
 
-    let argument = format!(
-        "cargo run -- ./tests \"DELETE FROM {} WHERE Nombre = Paula;\"",
-        table_name
-    );
+            let expected_output = "9,Diego,Navarro,39,dnavarro@gmail.com,empresario";
 
-    let mut command = Command::new("sh") // Use "cmd" for Windows
-        .arg("-c") // Execute a shell command
-        .arg(argument)
-        .spawn()
-        .unwrap();
+            assert_eq!(last_line, expected_output);
+        }
+        Err(e) => {
+            // this test has failed due a temp file wasnt abled to be generated.
+            // this means it wasnt able to generate a temp file for any reason.
+            return Err(e);
+        }
+    }
 
-    command.wait().unwrap();
-
-    let reader = BufReader::new(File::open(&route_file).unwrap());
-    let _ = std::fs::remove_file(&route_file).unwrap();
-
-    let last_line = reader.lines().last().unwrap().unwrap();
-
-    let expected_output = "9,Diego,Navarro,39,dnavarro@gmail.com,empresario";
-
-    assert_eq!(last_line, expected_output);
+    Ok(())
 }
 
 #[test]
-fn integration_delete_whole_database_query() {
-    // create a new file;
-    let route_file = format!("./tests/delete_query_whole_database.csv");
-    common::setup(&route_file);
+fn integration_delete_whole_database_query() -> Result<(), Tperrors> {
+    // paula is the last entry on our mock file.
+    let file_name = String::from("query_delete_whole_database");
+    let delete = Delete;
+    let mut table = Table::<Cursor<&[u8]>>::mock(file_name, common::csv_data_as_bytes());
 
-    let table_name_start = route_file.rfind("/").unwrap() + 1;
-    let table_name_end = route_file.rfind(".").unwrap();
-    let table_name = &route_file[table_name_start..table_name_end];
+    let condition = None;
 
-    let argument = format!("cargo run -- ./tests \"DELETE FROM {};\"", table_name);
+    match delete.execute_delete_mock(&mut table, condition) {
+        Ok(mocked_file) => {
+            let expected_output = "Id,Nombre,Apellido,Edad,Correo electronico,Profesion";
 
-    let mut command = Command::new("sh") // Use "cmd" for Windows
-        .arg("-c") // Execute a shell command
-        .arg(argument)
-        .spawn()
-        .unwrap();
+            for line in mocked_file.lines() {
+                // we do this to read the whole file and find the matches, if any.
+                let line = line.unwrap();
+                assert_eq!(line, expected_output);
+            }
+            // so we iterated for the whole file, and we matched the expected output, so we are good.
+        }
+        Err(e) => return Err(e),
+    }
 
-    command.wait().unwrap();
-
-    let reader = BufReader::new(File::open(&route_file).unwrap());
-    let _ = std::fs::remove_file(&route_file).unwrap();
-
-    let last_line = reader.lines().last().unwrap().unwrap();
-
-    let expected_output = "Id,Nombre,Apellido,Edad,Correo electronico,Profesion";
-
-    assert_eq!(last_line, expected_output);
+    Ok(())
 }

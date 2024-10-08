@@ -1,6 +1,3 @@
-use std::fs::{File, OpenOptions};
-use std::io::Write; // Add this line to import the Write trait
-
 const CSV_DATA: &str = "Id,Nombre,Apellido,Edad,Correo electronico,Profesion\n\
 1,Juan,Perez,32,jperez@gmail.com,medico\n\
 2,Maria,Gomez,28,mgomez@gmail.com,abogado\n\
@@ -14,17 +11,8 @@ const CSV_DATA: &str = "Id,Nombre,Apellido,Edad,Correo electronico,Profesion\n\
 10,Paula,Hernández,31,phernandez@gmail.com,publicista\n\
 ";
 
-pub fn setup(file_full_path: &str) {
-    let _ = File::create(&file_full_path).unwrap();
-
-    for line in CSV_DATA.lines() {
-        let mut file = OpenOptions::new()
-            .write(true)
-            .append(true)
-            .open(&file_full_path)
-            .unwrap();
-        writeln!(file, "{}", line).unwrap();
-    }
+pub fn csv_data_as_bytes() -> &'static [u8] {
+    CSV_DATA.as_bytes()
 }
 
 pub fn return_iterator_from_mock_csv_file() -> impl Iterator<Item = String> {

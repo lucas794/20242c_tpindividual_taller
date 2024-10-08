@@ -1,80 +1,67 @@
-use std::{
-    fs::File,
-    io::{BufRead, BufReader},
-    process::Command,
+use std::io::{BufRead, Cursor};
+
+use tp_individual::{
+    consults::update::Update, errors::tperrors::Tperrors, handler_tables::table::Table,
 };
 
 pub mod common;
+
 #[test]
-fn integration_update_simple_query() {
-    // create a new file;
-    let route_file = format!("./tests/update_query_simple_query.csv");
-    common::setup(&route_file);
+fn integration_update_simple_query() -> Result<(), Tperrors> {
+    let file_name = String::from("query_update_simple_query");
+    let update = Update;
+    let mut table = Table::<Cursor<&[u8]>>::mock(file_name, common::csv_data_as_bytes());
 
-    let table_name_start = route_file.rfind("/").unwrap() + 1;
-    let table_name_end = route_file.rfind(".").unwrap();
-    let table_name = &route_file[table_name_start..table_name_end];
+    let columns: Vec<String> = Vec::from(vec!["Nombre".to_string(), "Edad".to_string()]);
+    let values: Vec<String> = Vec::from(vec!["TEST".to_string(), "45".to_string()]);
 
-    let argument = format!(
-        "cargo run -- ./tests \"UPDATE {} SET Nombre = 'TEST', Edad = 45 WHERE Edad = 31;\"",
-        table_name
-    );
+    let condition = Some("Edad =31");
 
-    let mut command = Command::new("sh") // Use "cmd" for Windows
-        .arg("-c") // Execute a shell command
-        .arg(argument)
-        .spawn()
-        .unwrap();
-
-    command.wait().unwrap();
-
-    // lets read the last line of the file
-    let reader = BufReader::new(File::open(&route_file).unwrap());
-    let _ = std::fs::remove_file(&route_file).unwrap();
-
-    let last_line = reader.lines().last().unwrap().unwrap();
-
-    let expected_output = "10,TEST,Hernández,45,phernandez@gmail.com,publicista";
-
-    assert_eq!(last_line, expected_output);
+    // this will replace the last entry of the mocked file
+    match update.execute_update_mock(&mut table, columns, values, condition) {
+        Ok(buf_reader) => {
+            let last_line = buf_reader.lines().last().unwrap().unwrap();
+            let expected_output = "10,TEST,Hernández,45,phernandez@gmail.com,publicista";
+            assert_eq!(last_line, expected_output);
+        }
+        Err(e) => {
+            // this test has failed due a temp file wasnt abled to be generated.
+            // this means it wasnt able to generate a temp file for any reason.
+            return Err(e);
+        }
+    }
+    Ok(())
 }
 
 #[test]
-fn integration_update_all_values_query() {
-    // create a new file;
-    let route_file = format!("./tests/update_query_update_all.csv");
-    common::setup(&route_file);
+fn integration_update_all_values_query() -> Result<(), Tperrors> {
+    let file_name = String::from("query_update_all_values_query");
+    let update = Update;
+    let mut table = Table::<Cursor<&[u8]>>::mock(file_name, common::csv_data_as_bytes());
 
-    let table_name_start = route_file.rfind("/").unwrap() + 1;
-    let table_name_end = route_file.rfind(".").unwrap();
-    let table_name = &route_file[table_name_start..table_name_end];
+    let columns: Vec<String> = Vec::from(vec!["Nombre".to_string(), "Edad".to_string()]);
+    let values: Vec<String> = Vec::from(vec!["TEST".to_string(), "45".to_string()]);
 
-    let argument = format!(
-        "cargo run -- ./tests \"UPDATE {} SET Nombre = Lucas, Edad = 32;\"",
-        table_name
-    );
+    let condition = None;
 
-    let mut command = Command::new("sh") // Use "cmd" for Windows
-        .arg("-c") // Execute a shell command
-        .arg(argument)
-        .spawn()
-        .unwrap();
-
-    command.wait().unwrap();
-    // lets read the last line of the file
-    let reader = BufReader::new(File::open(&route_file).unwrap());
-    let _ = std::fs::remove_file(&route_file).unwrap();
-
-    const COLUMN_NAME_INDEX: usize = 1;
-    const COLUMN_AGE_INDEX: usize = 3;
-
-    for line in reader.lines().skip(1) {
-        // skip headers
-        let line = line.unwrap();
-        let name_column = line.split(",").nth(COLUMN_NAME_INDEX).unwrap();
-        let age_column = line.split(",").nth(COLUMN_AGE_INDEX).unwrap();
-
-        // all name, age columns should match lucas,32
-        assert_eq!((name_column, age_column), ("Lucas", "32"));
+    // this will replace all entry of the mocked file :D
+    match update.execute_update_mock(&mut table, columns, values, condition) {
+        Ok(buf_reader) => {
+            // headers should match at start, so now we will check the next lines
+            const INDEX_COLUMN_NAME: usize = 1;
+            const INDEX_COLUMN_AGE: usize = 3;
+            for line in buf_reader.lines().skip(1) {
+                let line = line.unwrap();
+                let columns = line.split(",").collect::<Vec<&str>>();
+                assert_eq!(columns[INDEX_COLUMN_NAME], "TEST");
+                assert_eq!(columns[INDEX_COLUMN_AGE], "45");
+            }
+        }
+        Err(e) => {
+            // this test has failed due a temp file wasnt abled to be generated.
+            // this means it wasnt able to generate a temp file for any reason.
+            return Err(e);
+        }
     }
+    Ok(())
 }
