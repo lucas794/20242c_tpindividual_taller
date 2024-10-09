@@ -57,3 +57,34 @@ fn integration_delete_whole_database_query() -> Result<(), Tperrors> {
 
     Ok(())
 }
+
+#[test]
+fn integration_delete_expanded_query_with_column_as_condition() -> Result<(), Tperrors> {
+    // We are gonna try to simulate a
+    // DELETE FROM clientes WHERE (Id>=2 AND Edad>=30 AND 1=1);"
+    // this is gonna return rows with id 1,2, 5, 8 according sandboxSQL.
+
+    let file_name = String::from("delete_expanded_query_with_column_as_condition");
+    let delete = Delete;
+    let mut table = Table::<Cursor<&[u8]>>::mock(file_name, common::csv_data_as_bytes());
+    let condition = Some("Id>=2 AND Edad>=30 AND 1=1");
+
+    match delete.execute_delete_mock(&mut table, condition) {
+        Ok(mocked_file) => {
+            let expected_output_vectors = vec![
+                "Id,Nombre,Apellido,Edad,Correo electronico,Profesion", // ofc we are gonna have the header.
+                "1,Juan,Perez,32,jperez@gmail.com,medico",
+                "2,Maria,Gomez,28,mgomez@gmail.com,abogado",
+                "5,Luis,Martínez,29,lmartinez@gmail.com,profesor",
+                "8,Lucía,Ramos,26,lramos@gmail.com,psicóloga",
+            ];
+
+            for (i, line_read) in mocked_file.lines().enumerate() {
+                let line = line_read.unwrap();
+                assert_eq!(line, expected_output_vectors[i]);
+            }
+        }
+        Err(e) => return Err(e),
+    }
+    Ok(())
+}

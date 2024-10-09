@@ -1,7 +1,8 @@
-use std::io::Cursor;
+use std::{io::Cursor, vec};
 
 use tp_individual::{
     consults::select::Select, errors::tperrors::Tperrors, handler_tables::table::Table,
+    sorter::sort::SortMethod,
 };
 
 pub mod common;
@@ -209,5 +210,47 @@ fn integration_select_advanced_query_with_nested_conditions_and_spaced_condition
         }
     }
 
+    Ok(())
+}
+
+#[test]
+fn integration_select_advanced_query_sorting_with_columns_not_present_on_the_query(
+) -> Result<(), Tperrors> {
+    // the idea is to simulate a
+    // SELECT Nombre, Apellido FROM clientes WHERE Id>8 ORDER BY Edad;
+    // this should return the following rows: Paula Hernandez, Andres Garcia and Diego Navarro
+
+    let file_name =
+        String::from("query_select_advanced_query_sorting_with_columns_not_present_on_the_query");
+    let select = Select;
+    let mut table = Table::<Cursor<&[u8]>>::mock(file_name, common::csv_data_as_bytes());
+
+    let columns: Vec<String> = Vec::from(vec!["Nombre".to_string(), "Apellido".to_string()]);
+    let condition = Some("Id>8");
+    let sort_method = Some(vec![SortMethod {
+        by_column: "Edad".to_string(),
+        ascending: true,
+    }]);
+
+    match select.execute_select_mock(&mut table, columns, condition, sort_method) {
+        Ok(vector_of_lines) => {
+            let expected_output = vec![
+                vec!["Nombre", "Apellido"],
+                vec!["Paula", "Hernández"],
+                vec!["Diego", "Navarro"],
+            ];
+
+            for (i, row) in vector_of_lines.iter().enumerate() {
+                let expected_row = &expected_output[i];
+
+                for (j, cell) in row.iter().enumerate() {
+                    assert_eq!(cell, &expected_row[j]);
+                }
+            }
+        }
+        Err(e) => {
+            return Err(e);
+        }
+    }
     Ok(())
 }
