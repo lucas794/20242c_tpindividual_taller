@@ -85,7 +85,7 @@ impl<R: Read + Seek> Table<R> {
         columns: Vec<String>,
         opt_conditions_as_str: Option<&str>,
         vector_sorting: Option<Vec<SortMethod>>,
-    ) -> Result<Vec<Vec<String>>, std::io::Error> {
+    ) -> Result<Vec<Vec<String>>, Tperrors> {
         let columns_from_file = self.get_column_from_file()?;
 
         // if len is 1 AND the only element is a * (joker) we need to get all the columns
@@ -99,23 +99,36 @@ impl<R: Read + Seek> Table<R> {
                         .iter()
                         .position(|col| col == c)
                         .ok_or_else(|| {
-                            std::io::Error::new(
-                                std::io::ErrorKind::Other,
-                                format!("Invalid column {} inside the query (not in the file)", c),
-                            )
+                            Tperrors::Column(format!("Invalid column {} inside the query", c))
                         })
                 })
-                .collect::<Result<Vec<usize>, std::io::Error>>()?
+                .collect::<Result<Vec<usize>, Tperrors>>()?
         };
 
         let mut result: Vec<Vec<String>> = Vec::new();
 
-        self.reader.seek(SeekFrom::Start(0))?;
+        match self.reader.seek(SeekFrom::Start(0)) {
+            Ok(_) => {}
+            Err(e) => {
+                return Err(Tperrors::Generic(format!(
+                    "Error while trying to read the file: {}",
+                    e
+                )));
+            }
+        }
         let reader = &mut self.reader;
 
         let index_columns = (0..columns_from_file.len()).collect::<Vec<usize>>();
         for line in reader.by_ref().lines().skip(1) {
-            let line = line?;
+            let line = match line {
+                Ok(l) => l,
+                Err(e) => {
+                    return Err(Tperrors::Generic(format!(
+                        "Error while trying to read the file: {}",
+                        e
+                    )));
+                }
+            };
             let splitted_line = line.split(",").collect::<Vec<&str>>();
 
             if opt_conditions_as_str.is_some() {
@@ -132,7 +145,7 @@ impl<R: Read + Seek> Table<R> {
                     Ok(false) => {}
                     Err(e) => {
                         let e = e.to_string();
-                        return Err(std::io::Error::new(std::io::ErrorKind::Other, e));
+                        return Err(Tperrors::Generic(e));
                     }
                 }
             } else {
@@ -149,10 +162,7 @@ impl<R: Read + Seek> Table<R> {
                     .iter()
                     .position(|c| c == column)
                     .ok_or_else(|| {
-                        std::io::Error::new(
-                            std::io::ErrorKind::Other,
-                            format!("Invalid column {} inside the query to sort", column),
-                        )
+                        Tperrors::Column(format!("Invalid column {} inside the query", column))
                     })?;
 
                 result.sort_by(|a, b| {
@@ -211,14 +221,9 @@ impl<R: Read + Seek> Table<R> {
         &mut self,
         columns: Vec<String>,
         values: Vec<Vec<String>>,
-    ) -> Result<Vec<Vec<String>>, std::io::Error> {
+    ) -> Result<Vec<Vec<String>>, Tperrors> {
         // we need to check if the columns are valid
-        let splitted_columns_from_file = match self.get_column_from_file() {
-            Ok(columns) => columns,
-            Err(e) => {
-                return Err(e);
-            }
-        };
+        let splitted_columns_from_file = self.get_column_from_file()?;
 
         // if any of the vec inside values matches column, we are sending all values
         let temp_index = if columns
@@ -236,9 +241,8 @@ impl<R: Read + Seek> Table<R> {
         };
         // columns != temp_index OR the table doesn't exist in the csv file.
         if columns.len() != temp_index.len() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Invalid columns",
+            return Err(Tperrors::Column(
+                "Invalid column inside the query".to_string(),
             ));
         }
 
@@ -265,9 +269,8 @@ impl<R: Read + Seek> Table<R> {
                         let reference = match temp_index.iter().position(|&x| x == i) {
                             Some(p) => p,
                             None => {
-                                return Err(std::io::Error::new(
-                                    std::io::ErrorKind::Other,
-                                    "Position not found",
+                                return Err(Tperrors::Generic(
+                                    "Position not found inside the columns".to_string(),
                                 ));
                             }
                         };
@@ -296,14 +299,9 @@ impl<R: Read + Seek> Table<R> {
         values: Vec<String>,
         opt_conditions: Option<&str>,
         file_to_write: W, // its either a Cursor o a File as temp
-    ) -> Result<(), std::io::Error> {
+    ) -> Result<(), Tperrors> {
         // we need to check if the columns are valid
-        let splitted_columns_from_file = match self.get_column_from_file() {
-            Ok(columns) => columns,
-            Err(e) => {
-                return Err(e);
-            }
-        };
+        let splitted_columns_from_file = self.get_column_from_file()?;
 
         let index_selected_column: Vec<usize> = splitted_columns_from_file
             .iter()
@@ -325,9 +323,8 @@ impl<R: Read + Seek> Table<R> {
                 let position = match index_selected_column.iter().position(|&x| x == i) {
                     Some(p) => p,
                     None => {
-                        return Err(std::io::Error::new(
-                            std::io::ErrorKind::Other,
-                            "Position not found",
+                        return Err(Tperrors::Generic(
+                            "Position not found inside the columns".to_string(),
                         ));
                     }
                 };
@@ -335,15 +332,38 @@ impl<R: Read + Seek> Table<R> {
             }
         }
 
-        self.reader.seek(SeekFrom::Start(0))?;
+        match self.reader.seek(SeekFrom::Start(0)) {
+            Ok(_) => {}
+            Err(e) => {
+                return Err(Tperrors::Generic(format!(
+                    "Error while trying to read the file: {}",
+                    e
+                )));
+            }
+        }
 
         let mut temporal_file = BufWriter::new(file_to_write);
 
-        temporal_file.write_all(splitted_columns_from_file.join(",").as_bytes())?;
-        temporal_file.write_all("\n".as_bytes())?;
+        match Self::write_a_line(splitted_columns_from_file.join(","), &mut temporal_file) {
+            Ok(_) => {}
+            Err(e) => {
+                return Err(Tperrors::Generic(format!(
+                    "Error while trying to write the file: {}",
+                    e
+                )));
+            }
+        }
 
         for line in self.reader.by_ref().lines().skip(1) {
-            let line = line?;
+            let line = match line {
+                Ok(l) => l,
+                Err(e) => {
+                    return Err(Tperrors::Generic(format!(
+                        "Error while trying to read the file: {}",
+                        e
+                    )));
+                }
+            };
             let splitted_line = line.split(",").collect::<Vec<&str>>();
 
             match opt_conditions {
@@ -368,18 +388,29 @@ impl<R: Read + Seek> Table<R> {
                             }
                             // convert it as Vec<String
 
-                            temporal_file.write_all(new_line.join(",").as_bytes())?;
-                            temporal_file.write_all("\n".as_bytes())?;
+                            match Self::write_a_line(new_line.join(","), &mut temporal_file) {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    return Err(Tperrors::Generic(format!(
+                                        "Error while trying to write the file: {}",
+                                        e
+                                    )));
+                                }
+                            }
                         }
                         Ok(false) => {
-                            temporal_file.write_all(splitted_line.join(",").as_bytes())?;
-                            temporal_file.write_all("\n".as_bytes())?;
+                            match Self::write_a_line(splitted_line.join(","), &mut temporal_file) {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    return Err(Tperrors::Generic(format!(
+                                        "Error while trying to write the file: {}",
+                                        e
+                                    )));
+                                }
+                            }
                         }
                         Err(_) => {
-                            return Err(std::io::Error::new(
-                                std::io::ErrorKind::Other,
-                                "Error checking conditions".to_string(),
-                            ));
+                            return Err(Tperrors::Generic("Error checking conditions".to_string()));
                         }
                     }
                 }
@@ -389,12 +420,27 @@ impl<R: Read + Seek> Table<R> {
                     for (i, value) in hash_changes.iter() {
                         new_line[*i] = value;
                     }
-                    temporal_file.write_all(new_line.join(",").as_bytes())?;
-                    temporal_file.write_all("\n".as_bytes())?;
+                    match Self::write_a_line(new_line.join(","), &mut temporal_file) {
+                        Ok(_) => {}
+                        Err(e) => {
+                            return Err(Tperrors::Generic(format!(
+                                "Error while trying to write the file: {}",
+                                e
+                            )));
+                        }
+                    }
                 }
             }
         }
-        temporal_file.flush()?;
+        match temporal_file.flush() {
+            Ok(_) => {}
+            Err(e) => {
+                return Err(Tperrors::Generic(format!(
+                    "Error while trying to write the file: {}",
+                    e
+                )));
+            }
+        }
         Ok(())
     }
 
@@ -409,9 +455,25 @@ impl<R: Read + Seek> Table<R> {
         columns: Vec<String>,
         values: Vec<String>,
         opt_conditions: Option<&str>,
-    ) -> Result<String, std::io::Error> {
-        let temporal_file_path = self.generate_temporal_file_path()?;
-        let temporal_file = File::create(&temporal_file_path)?;
+    ) -> Result<String, Tperrors> {
+        let temporal_file_path = match self.generate_temporal_file_path() {
+            Ok(path) => path,
+            Err(e) => {
+                return Err(Tperrors::Generic(format!(
+                    "Error while trying to generate temporal file: {}",
+                    e
+                )));
+            }
+        };
+        let temporal_file = match File::create(&temporal_file_path) {
+            Ok(file) => file,
+            Err(e) => {
+                return Err(Tperrors::Generic(format!(
+                    "Error while trying to create temporal file: {}",
+                    e
+                )));
+            }
+        };
         self.resolve_update(columns, values, opt_conditions, temporal_file)?;
         Ok(temporal_file_path)
     }
@@ -421,13 +483,21 @@ impl<R: Read + Seek> Table<R> {
         columns: Vec<String>,
         values: Vec<String>,
         opt_conditions: Option<&str>,
-    ) -> Result<BufReader<Cursor<Vec<u8>>>, std::io::Error> {
+    ) -> Result<BufReader<Cursor<Vec<u8>>>, Tperrors> {
         let cursor = Cursor::new(Vec::new());
         let mut writer = BufWriter::new(cursor);
 
         self.resolve_update(columns, values, opt_conditions, &mut writer)?;
 
-        let inner_buffer = writer.into_inner()?.into_inner();
+        let inner_buffer = match writer.into_inner() {
+            Ok(b) => b.into_inner(),
+            Err(e) => {
+                return Err(Tperrors::Generic(format!(
+                    "Error while trying to write the file: {}",
+                    e
+                )));
+            }
+        };
         Ok(BufReader::new(Cursor::new(inner_buffer)))
     }
 
@@ -480,6 +550,23 @@ impl<R: Read + Seek> Table<R> {
         Ok(())
     }
 
+    /// Internal function to write a line
+    fn write_a_line<W: Write>(line: String, file: &mut W) -> Result<(), std::io::Error> {
+        match file.write_all(line.as_bytes()) {
+            Ok(_) => {}
+            Err(e) => {
+                return Err(e);
+            }
+        };
+        match file.write_all('\n'.to_string().as_bytes()) {
+            Ok(_) => {}
+            Err(e) => {
+                return Err(e);
+            }
+        }
+        Ok(())
+    }
+
     /// Internal function that resolves a delete operatior
     ///
     /// given a condition and a writter (file or cursor)
@@ -491,36 +578,53 @@ impl<R: Read + Seek> Table<R> {
         &mut self,
         conditions: Option<&str>,
         file: W,
-    ) -> Result<(), std::io::Error> {
+    ) -> Result<(), Tperrors> {
         // we need to check if the conditions are met
         // if they are met, we need to delete the line
         // else we need to keep the line
         // we need to write the lines that are not deleted in a temporal file
         // and then rename the temporal file to the original file
         // lets get the first line of the file to copy on the new file
-        let splitted_columns_from_file = match self.get_column_from_file() {
-            Ok(columns) => columns,
-            Err(e) => {
-                return Err(e);
-            }
-        };
-        let columns_from_csv = splitted_columns_from_file.join(",");
+        let splitted_columns_from_file = self.get_column_from_file()?;
 
-        self.reader.seek(SeekFrom::Start(0))?;
+        let columns_from_csv = splitted_columns_from_file.join(",");
+        match self.reader.seek(SeekFrom::Start(0)) {
+            Ok(_) => {}
+            Err(e) => {
+                return Err(Tperrors::Generic(format!(
+                    "Error while trying to read the file: {}",
+                    e
+                )));
+            }
+        }
 
         let mut temporal_file = BufWriter::new(file);
 
-        temporal_file.write_all(columns_from_csv.as_bytes())?;
-        temporal_file.write_all("\n".as_bytes())?;
+        match Self::write_a_line(columns_from_csv, &mut temporal_file) {
+            Ok(_) => {}
+            Err(e) => {
+                return Err(Tperrors::Generic(format!(
+                    "Error while trying to write the file: {}",
+                    e
+                )));
+            }
+        }
 
         for line in self.reader.by_ref().lines().skip(1) {
-            let line = line?;
+            let line = match line {
+                Ok(l) => l,
+                Err(e) => {
+                    return Err(Tperrors::Generic(format!(
+                        "Error while trying to read the file: {}",
+                        e
+                    )));
+                }
+            };
             let splitted_line = line.split(",").collect::<Vec<&str>>();
 
             match conditions {
                 Some(str_conditions) => {
-                    let splitted_columns = columns_from_csv.split(",").collect::<Vec<&str>>();
-                    let splitted_columns_as_string = splitted_columns
+                    let splitted_columns_as_string = splitted_columns_from_file
                         .iter()
                         .map(|s| s.to_string())
                         .collect::<Vec<String>>();
@@ -538,14 +642,19 @@ impl<R: Read + Seek> Table<R> {
                         Ok(false) => {
                             // criteria reached, we need to change the index
                             // of the columns according to the hash database with the proper value
-                            temporal_file.write_all(line.as_bytes())?;
-                            temporal_file.write_all("\n".as_bytes())?;
+
+                            match Self::write_a_line(line, &mut temporal_file) {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    return Err(Tperrors::Generic(format!(
+                                        "Error while trying to write the file: {}",
+                                        e
+                                    )));
+                                }
+                            }
                         }
                         Err(_) => {
-                            return Err(std::io::Error::new(
-                                std::io::ErrorKind::Other,
-                                "Error checking conditions",
-                            ));
+                            return Err(Tperrors::Generic("Error checking conditions".to_string()));
                         }
                     }
                 }
@@ -554,7 +663,15 @@ impl<R: Read + Seek> Table<R> {
                 }
             }
         }
-        temporal_file.flush()?;
+        match temporal_file.flush() {
+            Ok(_) => {}
+            Err(e) => {
+                return Err(Tperrors::Generic(format!(
+                    "Error while trying to write the file: {}",
+                    e
+                )));
+            }
+        }
         Ok(())
     }
 
@@ -566,9 +683,25 @@ impl<R: Read + Seek> Table<R> {
     pub fn resolve_delete_for_file(
         &mut self,
         conditions: Option<&str>,
-    ) -> Result<String, std::io::Error> {
-        let temporal_file_path = self.generate_temporal_file_path()?;
-        let temporal_file = File::create(&temporal_file_path)?;
+    ) -> Result<String, Tperrors> {
+        let temporal_file_path = match self.generate_temporal_file_path() {
+            Ok(path) => path,
+            Err(e) => {
+                return Err(Tperrors::Generic(format!(
+                    "Error while trying to generate temporal file: {}",
+                    e
+                )));
+            }
+        };
+        let temporal_file = match File::create(&temporal_file_path) {
+            Ok(file) => file,
+            Err(e) => {
+                return Err(Tperrors::Generic(format!(
+                    "Error while trying to create temporal file: {}",
+                    e
+                )));
+            }
+        };
         self.resolve_delete(conditions, temporal_file)?;
         Ok(temporal_file_path)
     }
@@ -581,13 +714,21 @@ impl<R: Read + Seek> Table<R> {
     pub fn resolve_delete_mock(
         &mut self,
         conditions: Option<&str>,
-    ) -> Result<BufReader<Cursor<Vec<u8>>>, std::io::Error> {
+    ) -> Result<BufReader<Cursor<Vec<u8>>>, Tperrors> {
         let cursor = Cursor::new(Vec::new());
         let mut writer = BufWriter::new(cursor);
 
         self.resolve_delete(conditions, &mut writer)?;
 
-        let inner_buffer = writer.into_inner()?.into_inner();
+        let inner_buffer = match writer.into_inner() {
+            Ok(b) => b.into_inner(),
+            Err(e) => {
+                return Err(Tperrors::Generic(format!(
+                    "Error while trying to write the file: {}",
+                    e
+                )));
+            }
+        };
         Ok(BufReader::new(Cursor::new(inner_buffer)))
     }
 
@@ -623,9 +764,33 @@ impl<R: Read + Seek> Table<R> {
     }
 
     /// gets the columns of the table as string
-    fn get_column_from_file(&mut self) -> Result<Vec<String>, std::io::Error> {
-        self.reader.seek(SeekFrom::Start(0))?;
-        let first_column = self.reader.by_ref().lines().next().unwrap()?;
+    fn get_column_from_file(&mut self) -> Result<Vec<String>, Tperrors> {
+        match self.reader.seek(SeekFrom::Start(0)) {
+            Ok(_) => {}
+            Err(e) => {
+                return Err(Tperrors::Generic(format!(
+                    "Error while trying to read the file: {}",
+                    e
+                )));
+            }
+        }
+
+        let first_column = match self.reader.by_ref().lines().next() {
+            Some(line) => match line {
+                Ok(l) => l,
+                Err(e) => {
+                    return Err(Tperrors::Generic(format!(
+                        "Error while trying to read the file: {}",
+                        e
+                    )));
+                }
+            },
+            None => {
+                return Err(Tperrors::Column(
+                    "Error while trying to read the file: No columns found".to_string(),
+                ));
+            }
+        };
         let splitted_columns = first_column.split(",").collect::<Vec<&str>>();
         Ok(splitted_columns.iter().map(|s| s.to_string()).collect())
     }

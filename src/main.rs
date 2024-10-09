@@ -39,12 +39,7 @@ fn run(args: Vec<String>) -> Result<(), Tperrors> {
     let file = &args[1];
     let consult = &args[2].trim();
 
-    let folder_tables = match FolderTables::new(file) {
-        Ok(folder_tables) => folder_tables,
-        Err(e) => {
-            return Err(Tperrors::Table(e.to_string()));
-        }
-    };
+    let folder_tables = FolderTables::new(file)?;
 
     let splitted_consult = consult.split(" ").collect::<Vec<&str>>();
     let command = splitted_consult[0];
