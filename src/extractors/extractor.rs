@@ -73,7 +73,7 @@ impl Extractor {
 
         if count_single_quotes % 2 != 0 {
             return Err(Tperrors::Syntax(
-                "Invalid UPDATE query (Unbalanced single quotes)".to_string(),
+                "Invalid INSERT query (Unbalanced single quotes)".to_string(),
             ));
         }
 
@@ -689,6 +689,16 @@ mod tests {
         let consult = "INSERT INTO users (name, age) VALUES ('John, 20);";
 
         let result = extractor.extract_columns_and_values_for_insert(consult);
+        assert_eq!(result.is_err(), true);
+    }
+
+    #[test]
+    fn extract_column_and_values_for_update_with_unbalanced_single_quotes_fails() {
+        let extractor = Extractor::new();
+
+        let consult = "UPDATE users SET name = 'John, age = 20 WHERE id = 3;";
+
+        let result = extractor.extract_columns_and_values_for_update(consult);
         assert_eq!(result.is_err(), true);
     }
 }
