@@ -630,6 +630,11 @@ impl<R: Read + Seek> Table<R> {
         Ok(splitted_columns.iter().map(|s| s.to_string()).collect())
     }
 
+    /// Generates a temporal file path
+    /// 
+    /// It will return a string with the path of the temporal file
+    /// 
+    /// If it fails it will throw a error from std::io::Error
     pub fn generate_temporal_file_path(&self) -> Result<String, std::io::Error> {
         let start = SystemTime::now();
         let since_the_epoch = match start.duration_since(UNIX_EPOCH) {

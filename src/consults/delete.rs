@@ -72,7 +72,7 @@ impl Delete {
     ///
     /// This function is used for testing purposes only.
     ///
-    /// It will return a BufReader<Cursor<Vec<u8>>> with the content of the file.
+    /// It will return a `BufReader<Cursor<Vec<u8>>>` with the content of the file.
     pub fn execute_delete_mock<R: Read + Seek>(
         &self,
         table: &mut Table<R>,

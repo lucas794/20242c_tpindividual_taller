@@ -99,3 +99,4 @@ cargo test --test '*'
 - [x] Arreglado error en returns de Table y FolderTables para matchear la funcion de retorno de creacion en vez de crear un nuevo error
 - [x] IMPORTANTE: fix con comparaciones con espacios en los strings (agregadas pruebas tambien)
 - [x] IMPORTANTE: Agregado soporte de operaciones con columnas como condiciones (SELECT * FROM clientes WHERE Id > Edad por ejemplo, agregado test también)
+- [x] IMPORTANTE: Agregado soporte para operaciones con constantes como condicionales (Ejemplo: SELECT * FROM clientes WHERE 1=1;) esto obviamente devolveria true por ende todas las filas.

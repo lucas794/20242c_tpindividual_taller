@@ -90,7 +90,7 @@ impl Update {
     ///
     /// Uses the same arguments as the normal execute_update function
     ///
-    /// The difference is that this function will return a BufReader<Cursor<Vec<u8>>>
+    /// The difference is that this function will return a `BufReader<Cursor<Vec<u8>>>``
     ///
     /// This is because the mock table is not a file, so we need to return the data in a different way
     pub fn execute_update_mock<R: Read + Seek>(

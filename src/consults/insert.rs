@@ -73,6 +73,21 @@ impl Insert {
         }
     }
 
+    /// Execute the insert query and return the inserted values but using a Mock
+    /// 
+    /// This function is used for testing purposes
+    /// 
+    /// # Arguments
+    /// 
+    /// * `table` - Table where the values will be inserted
+    /// 
+    /// * `columns` - Columns to insert
+    /// 
+    /// * `values` - Values to insert
+    /// 
+    /// # Returns
+    /// 
+    /// * `Result<Vec<Vec<String>>, Tperrors>` - A vector of the inserted values
     pub fn execute_insert_mock<R: Read + Seek>(
         &self,
         table: &mut Table<R>,
