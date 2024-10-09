@@ -54,9 +54,10 @@ impl Extractor {
     pub fn extract_columns_and_values_for_insert(
         &self,
         query: &str,
-    ) -> Result<(Vec<String>, Vec<String>), Tperrors> {
+    ) -> Result<(Vec<String>, Vec<Vec<String>>), Tperrors> {
+        // Step 1: Locate and extract columns
         let (start_columns, end_columns) = match (query.find("("), query.find(")")) {
-            (Some(start), Some(end)) => (start, end),
+            (Some(start), Some(end)) if query.contains("VALUES") => (start, end),
             _ => {
                 return Err(Tperrors::Syntax(
                     "Invalid INSERT query (Missing columns)".to_string(),
@@ -64,45 +65,91 @@ impl Extractor {
             }
         };
 
-        let (start_values, end_values) = match (query.rfind("("), query.rfind(")")) {
-            (Some(start), Some(end)) => (start, end),
-            _ => {
-                return Err(Tperrors::Syntax(
-                    "Invalid INSERT query (Missing values)".to_string(),
-                ));
-            }
-        };
-
         let columns_str = &query[start_columns + 1..end_columns];
-        let values_str = &query[start_values + 1..end_values];
-
-        // Parse the columns and values into vectors
         let columns: Vec<String> = columns_str
             .split(',')
             .map(|s| s.trim().trim_matches('\'').trim_matches('\"').to_string())
             .collect();
 
-        let values: Vec<String> = values_str
-            .split(',')
-            .map(|s| {
-                let trimmed = s.trim();
-                if trimmed.is_empty() {
-                    "".to_string()
-                } else {
-                    trimmed
-                        .trim()
-                        .trim_matches('\'')
-                        .trim_matches('\"')
-                        .to_string()
-                }
-            })
-            .collect();
+        // Step 2: Locate the VALUES section and extract multiple value sets
+        let values_index = query.find("VALUES").ok_or_else(|| {
+            Tperrors::Syntax("Invalid INSERT query (Missing VALUES keyword)".to_string())
+        })? + "VALUES".len();
 
-        // if len doesnt match we return an error
-        if columns.len() != values.len() {
+        let values_str = &query[values_index..].trim();
+
+        let mut value_sets = Vec::new();
+        let mut remaining_values_str = values_str.to_string(); // Create an owned string to avoid borrowing issues
+
+        while let Some(start) = remaining_values_str.find('(') {
+            if let Some(end) = remaining_values_str[start..].find(')') {
+                // Extract the value set between parentheses
+                let value_set = remaining_values_str[start + 1..start + end]
+                    .trim()
+                    .to_string();
+                value_sets.push(value_set); // Store the value set
+
+                // Update remaining_values_str to start from the character after the closing parenthesis
+                remaining_values_str = remaining_values_str[start + end + 1..].trim().to_string();
+            } else {
+                return Err(Tperrors::Syntax(
+                    "Invalid INSERT query (Mismatched parentheses in values)".to_string(),
+                ));
+            }
+        }
+
+        if value_sets.is_empty() {
             return Err(Tperrors::Syntax(
-                "Invalid INSERT query (Columns and values do not match)".to_string(),
+                "Invalid INSERT query (No values found)".to_string(),
             ));
+        }
+
+        // Step 4: Parse each value set and ensure it matches the column count
+        let mut values: Vec<Vec<String>> = Vec::new();
+        for value_set in value_sets {
+            let mut current_value = String::new();
+            let mut parsed_values = Vec::new();
+            let mut in_quotes = false;
+            let mut quote_char = ' ';
+
+            for c in value_set.chars() {
+                match c {
+                    '\'' | '\"' => {
+                        if in_quotes {
+                            if c == quote_char {
+                                in_quotes = false; // Closing the quote
+                            } else {
+                                current_value.push(c); // Inside a different quote
+                            }
+                        } else {
+                            in_quotes = true; // Starting a quote
+                            quote_char = c;
+                        }
+                    }
+                    ',' if !in_quotes => {
+                        // Comma separating values outside of quotes
+                        parsed_values.push(current_value.trim().to_string());
+                        current_value.clear();
+                    }
+                    _ => {
+                        current_value.push(c);
+                    }
+                }
+            }
+
+            // Add the last value
+            if !current_value.is_empty() {
+                parsed_values.push(current_value.trim().to_string());
+            }
+
+            // Ensure the number of values matches the number of columns
+            if parsed_values.len() != columns.len() {
+                return Err(Tperrors::Syntax(
+                    "Invalid INSERT query (Columns and values count mismatch)".to_string(),
+                ));
+            }
+
+            values.push(parsed_values);
         }
 
         Ok((columns, values))
@@ -547,7 +594,27 @@ mod tests {
             .unwrap();
 
         assert_eq!(columns, vec!["name".to_string(), "age".to_string()]);
-        assert_eq!(values, vec!["John".to_string(), "20".to_string()]);
+        assert_eq!(values, [["John".to_string(), "20".to_string()]]);
+    }
+
+    #[test]
+    fn extract_columns_and_values_from_insert_into_with_multiple_values() {
+        let extractor = Extractor::new();
+
+        let consult = "INSERT INTO users (name, age) VALUES ('John', 20), ('Lucas', 'Gabriel');";
+
+        let (columns, values) = extractor
+            .extract_columns_and_values_for_insert(consult)
+            .unwrap();
+
+        assert_eq!(columns, vec!["name".to_string(), "age".to_string()]);
+        assert_eq!(
+            values,
+            [
+                ["John".to_string(), "20".to_string()],
+                ["Lucas".to_string(), "Gabriel".to_string()]
+            ]
+        );
     }
 
     #[test]
@@ -555,6 +622,26 @@ mod tests {
         let extractor = Extractor::new();
 
         let consult = "INSERT INTO users (name, age) VALUES ('John', 20, 30);";
+
+        let result = extractor.extract_columns_and_values_for_insert(consult);
+        assert_eq!(result.is_err(), true);
+    }
+
+    #[test]
+    fn extract_columns_with_unbalanced_parentheses_fails() {
+        let extractor = Extractor::new();
+
+        let consult = "INSERT INTO users (name, age) VALUES ('John', 20;";
+
+        let result = extractor.extract_columns_and_values_for_insert(consult);
+        assert_eq!(result.is_err(), true);
+    }
+
+    #[test]
+    fn extract_columns_and_values_number_of_columns_and_values_mismatch_fails() {
+        let extractor = Extractor::new();
+
+        let consult = "INSERT INTO users (name, age) VALUES ('John');";
 
         let result = extractor.extract_columns_and_values_for_insert(consult);
         assert_eq!(result.is_err(), true);

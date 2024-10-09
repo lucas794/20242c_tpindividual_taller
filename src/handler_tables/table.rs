@@ -203,15 +203,15 @@ impl<R: Read + Seek> Table<R> {
 
     /// given a columns and values as Vec of String
     ///
-    /// It returns the proper line to write in the csv
+    /// It returns a vector of lines to add to the file.
     ///
     /// else returns a Error.
     ///
     pub fn resolve_insert(
         &mut self,
         columns: Vec<String>,
-        values: Vec<String>,
-    ) -> Result<Vec<String>, std::io::Error> {
+        values: Vec<Vec<String>>,
+    ) -> Result<Vec<Vec<String>>, std::io::Error> {
         // we need to check if the columns are valid
         let splitted_columns_from_file = match self.get_column_from_file() {
             Ok(columns) => columns,
@@ -220,8 +220,11 @@ impl<R: Read + Seek> Table<R> {
             }
         };
 
-        // if the column IS the same as values, this means that the columns weren't send on the query.
-        let temp_index = if columns != values {
+        // if any of the vec inside values matches column, we are sending all values
+        let temp_index = if columns
+            .iter()
+            .all(|c| splitted_columns_from_file.contains(c))
+        {
             splitted_columns_from_file
                 .iter()
                 .enumerate()
@@ -231,10 +234,8 @@ impl<R: Read + Seek> Table<R> {
         } else {
             (0..splitted_columns_from_file.len()).collect::<Vec<usize>>()
         };
-
         // columns != temp_index OR the table doesn't exist in the csv file.
         if columns.len() != temp_index.len() {
-            println!("This is failing");
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 "Invalid columns",
@@ -243,25 +244,43 @@ impl<R: Read + Seek> Table<R> {
 
         // now we need to each temp_index, writ the value
         // else we write a empty string
-        let mut line_to_write: Vec<String> = Vec::new();
-        for (i, _col) in splitted_columns_from_file.iter().enumerate() {
-            if temp_index.contains(&i) {
-                let position = match temp_index.iter().position(|&x| x == i) {
-                    Some(p) => p,
-                    None => {
-                        return Err(std::io::Error::new(
-                            std::io::ErrorKind::Other,
-                            "Position not found",
-                        ));
-                    }
-                };
-                line_to_write.push(values[position].to_string());
+        // Prepare the line to write, matching table columns
+        let mut vector_of_lines_to_writte: Vec<Vec<String>> = Vec::new();
+
+        for value in values {
+            // So now we have either a full value like (X,X,X,X,X,X)
+            // or (X,X), we need to find if the len is full, if it is
+            // then we need to join all values, if not, we need to replace
+            // the missing places with ""
+            let mut temporal_line_to_write = Vec::new();
+            if value.len() == splitted_columns_from_file.len() {
+                temporal_line_to_write.push(value.join(","));
             } else {
-                line_to_write.push("".to_string());
+                // we need to iter over all columns found inside the file.
+                // if the position i of the column is inside temp_index
+                // it means that the value must be written
+                for (i, _col) in splitted_columns_from_file.iter().enumerate() {
+                    if temp_index.contains(&i) {
+                        // we need the index reference on columns
+                        let reference = match temp_index.iter().position(|&x| x == i) {
+                            Some(p) => p,
+                            None => {
+                                return Err(std::io::Error::new(
+                                    std::io::ErrorKind::Other,
+                                    "Position not found",
+                                ));
+                            }
+                        };
+                        temporal_line_to_write.push(value[reference].to_string());
+                    } else {
+                        temporal_line_to_write.push("".to_string());
+                    }
+                }
             }
+            vector_of_lines_to_writte.push(temporal_line_to_write);
         }
 
-        Ok(line_to_write)
+        Ok(vector_of_lines_to_writte)
     }
 
     /// Private function that handles

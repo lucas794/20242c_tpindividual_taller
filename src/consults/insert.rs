@@ -37,18 +37,24 @@ impl Insert {
         &self,
         table: &mut Table<R>,
         columns: Vec<String>,
-        values: Vec<String>,
+        values: Vec<Vec<String>>,
     ) -> Result<(), Tperrors> {
         // we need to check if the columns are valid
+
         let resolve = table.resolve_insert(columns, values);
 
         match resolve {
-            Ok(line) => {
-                let line = line.join(",");
-                match table.insert_line_to_csv(line) {
-                    Ok(_) => Ok(()),
-                    Err(_) => Err(Tperrors::Generic("Error while inserting line".to_string())),
+            Ok(lines) => {
+                for line in lines {
+                    let line = line.join(",");
+                    match table.insert_line_to_csv(line) {
+                        Ok(_) => {}
+                        Err(_) => {
+                            return Err(Tperrors::Generic("Error while inserting line".to_string()))
+                        }
+                    }
                 }
+                Ok(())
             }
             Err(e) => {
                 let formatted_error = format!("{}", e);
@@ -71,13 +77,14 @@ impl Insert {
         &self,
         table: &mut Table<R>,
         columns: Vec<String>,
-        values: Vec<String>,
-    ) -> Result<String, Tperrors> {
+        values: Vec<Vec<String>>,
+    ) -> Result<Vec<Vec<String>>, Tperrors> {
         // we need to check if the columns are valid
+
         let resolve = table.resolve_insert(columns, values);
 
         match resolve {
-            Ok(line) => Ok(line.join(",")),
+            Ok(line) => Ok(line),
             Err(e) => {
                 let formatted_error = format!("{}", e);
                 let dots = formatted_error.find(":").unwrap_or_default();
