@@ -69,6 +69,14 @@ impl Extractor {
             }
         };
 
+        let count_single_quotes = query.matches('\'').count();
+
+        if count_single_quotes % 2 != 0 {
+            return Err(Tperrors::Syntax(
+                "Invalid UPDATE query (Unbalanced single quotes)".to_string(),
+            ));
+        }
+
         let columns_str = &query[start_columns + 1..end_columns];
         let columns: Vec<String> = columns_str
             .split(',')
@@ -182,6 +190,15 @@ impl Extractor {
                 ));
             }
         };
+
+        // lets check unbalanced '
+        let count_single_quotes = query.matches('\'').count();
+
+        if count_single_quotes % 2 != 0 {
+            return Err(Tperrors::Syntax(
+                "Invalid UPDATE query (Unbalanced single quotes)".to_string(),
+            ));
+        }
 
         let columns_str = &query[start_columns + "SET".len()..end_columns].trim();
 
@@ -663,5 +680,15 @@ mod tests {
 
         assert_eq!(columns, vec!["name".to_string(), "age".to_string()]);
         assert_eq!(values, vec!["John".to_string(), "20".to_string()]);
+    }
+
+    #[test]
+    fn extract_columns_and_values_for_insert_with_unbalanced_single_quotes_fails() {
+        let extractor = Extractor::new();
+
+        let consult = "INSERT INTO users (name, age) VALUES ('John, 20);";
+
+        let result = extractor.extract_columns_and_values_for_insert(consult);
+        assert_eq!(result.is_err(), true);
     }
 }
