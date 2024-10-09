@@ -74,12 +74,7 @@ impl Select {
         conditions: Option<&str>,
         sorting_method: Option<Vec<SortMethod>>,
     ) -> Result<Vec<Vec<String>>, Tperrors> {
-        let csv_data = table.resolve_select(columns, conditions, sorting_method);
-
-        match csv_data {
-            Ok(data) => Ok(data),
-            Err(e) => Err(e),
-        }
+        table.resolve_select(columns, conditions, sorting_method)
     }
 }
 

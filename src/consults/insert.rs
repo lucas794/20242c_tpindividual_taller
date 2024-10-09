@@ -39,8 +39,6 @@ impl Insert {
         columns: Vec<String>,
         values: Vec<Vec<String>>,
     ) -> Result<(), Tperrors> {
-        // we need to check if the columns are valid
-
         let resolve = table.resolve_insert(columns, values);
 
         match resolve {
@@ -81,14 +79,7 @@ impl Insert {
         columns: Vec<String>,
         values: Vec<Vec<String>>,
     ) -> Result<Vec<Vec<String>>, Tperrors> {
-        // we need to check if the columns are valid
-
-        let resolve = table.resolve_insert(columns, values);
-
-        match resolve {
-            Ok(line) => Ok(line),
-            Err(e) => Err(e),
-        }
+        table.resolve_insert(columns, values)
     }
 }
 

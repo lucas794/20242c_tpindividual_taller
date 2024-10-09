@@ -65,12 +65,7 @@ impl Delete {
         table: &mut Table<R>,
         conditions: Option<&str>,
     ) -> Result<BufReader<Cursor<Vec<u8>>>, Tperrors> {
-        let resolve = table.resolve_delete_mock(conditions);
-
-        match resolve {
-            Ok(b) => Ok(b),
-            Err(e) => Err(e),
-        }
+        table.resolve_delete_mock(conditions)
     }
 }
 

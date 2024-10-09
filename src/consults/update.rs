@@ -87,12 +87,7 @@ impl Update {
         values: Vec<String>,
         conditions: Option<&str>,
     ) -> Result<BufReader<Cursor<Vec<u8>>>, Tperrors> {
-        let resolve = table.resolve_update_mock(columns, values, conditions);
-
-        match resolve {
-            Ok(buf) => Ok(buf),
-            Err(e) => Err(e),
-        }
+        table.resolve_update_mock(columns, values, conditions)
     }
 }
 
