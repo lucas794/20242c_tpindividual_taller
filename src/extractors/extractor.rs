@@ -51,9 +51,9 @@ impl Extractor {
     /// INSERT INTO users (name, age) VALUES ('John', 20);
     ///
     /// Returns (["name", "age"], ["John", "20"])
-    /// 
+    ///
     /// INSERT INTO users (name, age) VALUES ('John', 20), ('Lucas', 'Gabriel');
-    /// 
+    ///
     /// Returns (["name", "age"], [["John", "20"], ["Lucas", "Gabriel"]])
     pub fn extract_columns_and_values_for_insert(
         &self,

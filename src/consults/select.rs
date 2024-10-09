@@ -73,13 +73,13 @@ impl Select {
     }
 
     /// Given a table, columns, conditions and sorting method
-    /// 
+    ///
     /// executes a SELECT query statement under a mock environment
-    /// 
+    ///
     /// Returns a vector of vectors with the data
-    /// 
+    ///
     /// If the query fails, it will return an error
-    /// 
+    ///
     pub fn execute_select_mock<R: Read + Seek>(
         &self,
         table: &mut Table<R>,

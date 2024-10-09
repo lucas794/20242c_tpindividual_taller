@@ -33,15 +33,15 @@ impl Condition {
     }
 
     /// Recursion function to evaluate the expression
-    /// 
+    ///
     /// This function will evaluate the expression and return the result
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `tokens` - A vector of strings that contains the tokens of the expression
-    /// 
+    ///
     /// * `i` - A mutable reference to the index of the current token being evaluated
-    /// 
+    ///
     /// Returns a Result with the boolean result of the expression
     fn evaluate_expression(&self, tokens: &[String], i: &mut usize) -> Result<bool, Tperrors> {
         let mut operator_stack: Vec<String> = vec![];
@@ -93,17 +93,17 @@ impl Condition {
     }
 
     /// Evaluate a single condition
-    /// 
+    ///
     /// This function will evaluate a single condition and return the result
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `tokens` - A vector of strings that contains the tokens of the condition
-    /// 
+    ///
     /// * `i` - A mutable reference to the index of the current token being evaluated
-    /// 
+    ///
     /// * `negate` - A boolean that indicates if the condition should be negated
-    /// 
+    ///
     /// Returns a Result with the boolean result of the condition
     fn evaluate_condition(
         &self,
@@ -187,13 +187,13 @@ impl Condition {
     }
 
     /// Preprocess the conditions to split them into tokens
-    /// 
+    ///
     /// This function will preprocess the conditions and split them into tokens
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `conditions` - A string that contains the conditions
-    /// 
+    ///
     /// Returns a vector of strings with the tokens of the conditions
     fn preprocess_conditions(&self, conditions: &str) -> Vec<String> {
         let mut result = Vec::new();
@@ -298,17 +298,17 @@ impl Condition {
         }
     }
     /// Private function that help to check if conditions are met between constants
-    /// 
+    ///
     /// This function will check if the conditions are met between constants
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `left` - The left constant value
-    /// 
+    ///
     /// * `operator` - The operator to be used in the comparison
-    /// 
+    ///
     /// * `right` - The right constant value
-    /// 
+    ///
     /// Returns a boolean indicating if the conditions are met
     fn resolve_constant_evaluation(&self, left: i64, operator: &str, right: i64) -> bool {
         // we reuse the same function, but we send the values as constants
@@ -316,15 +316,15 @@ impl Condition {
     }
 
     /// Split the conditions into tokens
-    /// 
+    ///
     /// This function will split the conditions into proper tokens if operators are not separated by spaces
     ///  
     /// # Arguments
-    /// 
+    ///
     /// * `input` - A vector of strings that contains the conditions
-    /// 
+    ///
     /// Returns a Result with a vector of strings containing the tokens of the conditions
-    /// 
+    ///
     /// If an invalid operator is found, a Syntax error is returned
     fn split_conditions(&self, input: &[String]) -> Result<Vec<String>, Tperrors> {
         let mut result = Vec::new();
@@ -386,15 +386,15 @@ impl Condition {
     }
 
     /// Function that will return the fixed column
-    /// 
+    ///
     /// This function will return the fixed column
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `tokens` - A vector of strings that contains the tokens of the condition
-    /// 
+    ///
     /// * `i` - A mutable reference to the index of the current token being evaluated
-    /// 
+    ///
     /// Returns a Result with the fixed column
     fn return_fixed_column(&self, tokens: &[String], i: &mut usize) -> Result<String, Tperrors> {
         let result: Result<String, Tperrors> =
@@ -432,15 +432,15 @@ impl Condition {
     }
 
     /// Function that will return the fixed value
-    /// 
+    ///
     /// This function will return the fixed value
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `tokens` - A vector of strings that contains the tokens of the condition
-    /// 
+    ///
     /// * `i` - A mutable reference to the index of the current token being evaluated
-    /// 
+    ///
     /// Returns a Result with the fixed value
     fn return_fixed_value(&self, tokens: &[String], i: &mut usize) -> Result<String, Tperrors> {
         let result: Result<String, Tperrors> = match tokens[*i].contains('\'')
